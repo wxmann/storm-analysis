@@ -7,7 +7,7 @@ from stormevents.time import convert_df_tz
 from testing.helpers import resource_path, assert_frame_eq_ignoring_dtypes
 
 
-@mock.patch('shared._timezones.tz_for_latlon')
+@mock.patch('shared.tzhelp.tz_for_latlon')
 def test_convert_df_timezone(latlontz):
     def handle_latlon_tz(lat, lon):
         if lat is None or lon is None:
@@ -26,7 +26,7 @@ def test_convert_df_timezone(latlontz):
     assert_frame_eq_ignoring_dtypes(converted_src_df, expected_df)
 
 
-@mock.patch('shared._timezones.tz_for_latlon')
+@mock.patch('shared.tzhelp.tz_for_latlon')
 def test_convert_df_timezone_multiple_times(latlontz):
     def handle_latlon_tz(lat, lon):
         if lat is None or lon is None:

@@ -57,16 +57,16 @@ def test_load_multiple_years_storm_data(reqpatch):
     assert_frame_eq_ignoring_dtypes(df, df_expected)
 
 
-@mock.patch('wxdata.http.get_links', return_value=(
+@mock.patch('shared.req.get_links', return_value=(
         'StormEvents_details-ftp_v1.0_d1990_c20170717.csv.gz',
         'StormEvents_details-ftp_v1.0_d1991_c20170717.csv.gz',
         'StormEvents_details-ftp_v1.0_d1992_c20170717.csv.gz',
 ))
 def test_load_multiple_years_storm_data_localize_to_tz(reqpatch):
     workdir.setto(resource_path(''))
-    df = stormevents.load_events('1990-01-01', '1992-10-31', eventtypes=['Tornado'],
+    df = load_events('1990-01-01', '1992-10-31', eventtypes=['Tornado'],
                                  states=['Texas', 'Oklahoma', 'Kansas'], tz='EST')
 
-    df_expected = stormevents.load_file(resource_path('multiyear_storm_events_EST_expected.csv'),
+    df_expected = load_file(resource_path('multiyear_storm_events_EST_expected.csv'),
                                         tz_localize=True)
     assert_frame_eq_ignoring_dtypes(df, df_expected)

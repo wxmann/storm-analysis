@@ -1,5 +1,4 @@
 import pytz
-import six
 
 
 class TimeZone(object):
@@ -74,28 +73,6 @@ for tz in (tz for tz in SUPPORTED_TIMEZONES if not tz.isdst):
         _state_std_tz_map[st] = tz
 
 
-def tz_for_state(state):
-    state = state.upper().strip()
-    found_tz = _state_std_tz_map.get(state, None)
-    if found_tz is None:
-        return None
-    return found_tz.to_pytz()
-
-
-def tz_for_latlon(lat, lon):
-    try:
-        from geopy import geocoders
-    except ImportError:
-        import warnings
-        warnings.warn("Can't find timezone from location without the `geopy` module."
-                      "Please install that module.")
-        raise
-
-    g = geocoders.Nominatim()
-    found_tz = g.timezone((lat, lon))
-    return found_tz
-
-
 _timezone_map = {}
 for tz in SUPPORTED_TIMEZONES:
     _timezone_map[tz.abbrev] = tz
@@ -105,42 +82,76 @@ for tz in SUPPORTED_TIMEZONES:
     _timezone_map['UTC'] = GMT
 
 
-def get_tz_info(abbrev):
+class UnsupportedTimeZoneException(pytz.UnknownTimeZoneError):
+    pass
+
+
+class MultipleStatesInTimeZoneException(Exception):
+    pass
+
+
+__all__ = ['tz_for_state', 'to_pytz', 'tz_for_latlon']
+
+
+def _find_tz(abbrev):
     if abbrev is None:
-        raise ValueError('Cannot get TZ info for `None`')
+        raise UnsupportedTimeZoneException('Cannot get TZ info for `None`')
     tz_str = abbrev.upper().strip()
-    if tz_str not in _timezone_map:
-        raise ValueError("Invalid tz: {} (or offset does not match tz abbrevation)".format(tz_str))
-    return _timezone_map[tz_str]
+    try:
+        return _timezone_map[tz_str]
+    except KeyError:
+        raise UnsupportedTimeZoneException("Invalid tz: {} (or offset does not match tz abbrevation)".format(tz_str))
 
 
-def parse_tz(tz_str):
+def tz_for_state(state):
+    state = state.upper().strip()
+    try:
+        return _state_std_tz_map[state].to_pytz()
+    except KeyError:
+        raise MultipleStatesInTimeZoneException
+
+
+# try to use this sparingly, it has perf issues
+def tz_for_latlon(lat, lon):
+    from tzwhere import tzwhere
+    tzname = tzwhere.tzwhere().tzNameAt(lat, lon)
+
+    # tzname is DST-dependent, we want to freeze it at a constant GMT-offset
+    offset = utc_offset_no_dst(tzname)
+    if offset < 0:
+        tzname = 'Etc/GMT+{}'.format(-offset)
+    else:
+        tzname = 'Etc/GMT-{}'.format(offset)
+    return to_pytz(tzname)
+
+
+def to_pytz(tz_str):
     if tz_str is None:
-        return get_tz_info(tz_str).to_pytz()
+        return _find_tz(tz_str).to_pytz()
     try:
         # we're good here
         return pytz.timezone(tz_str)
     except pytz.UnknownTimeZoneError:
         # get it from our hard-coded list
-        return get_tz_info(tz_str).to_pytz()
+        return _find_tz(tz_str).to_pytz()
 
 
-def utc_offset_no_dst(tz_str, as_of=None):
+def utc_offset_no_dst(tz, as_of=None):
     try:
         from datetime import datetime, timedelta
-        if isinstance(tz_str, six.string_types):
-            tz = pytz.timezone(tz_str)
+        if isinstance(tz, str):
+            tz_to_act = pytz.timezone(tz)
         else:
-            tz = tz_str
+            tz_to_act = tz
 
         if as_of is None:
             as_of = datetime(datetime.now().year, 1, 1)
-        dt = tz.utcoffset(as_of) - tz.dst(as_of)
+        dt = tz_to_act.utcoffset(as_of) - tz_to_act.dst(as_of)
 
         if dt < timedelta(0):
             return -24 + dt.seconds // 3600
         return dt.seconds // 3600
 
     except pytz.UnknownTimeZoneError:
-        tz = get_tz_info(tz_str)
-        return tz.utc_offset - tz.isdst
+        tz_to_act = _find_tz(tz)
+        return tz_to_act.utc_offset - tz_to_act.isdst

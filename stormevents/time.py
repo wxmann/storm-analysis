@@ -1,8 +1,9 @@
 import warnings
 
 import pandas as pd
+import pytz
 
-from shared import _timezones as _tzhelp
+from shared import tzhelp as _tzhelp
 
 __all__ = ['convert_df_tz', 'sync_datetime_fields',
            'convert_timestamp_tz', 'localize_timestamp_tz',
@@ -39,37 +40,23 @@ def convert_row_tz(row, col, to_tz):
 
         # moving on now...
         return convert_timestamp_tz(row[col], row['cz_timezone'], to_tz)
-    except ValueError as e:
-        # warnings.warn("Encountered an error while converting time zone, {}. "
-        #               "\nAttempting to use location data to determine tz".format(repr(e)))
+    except CannotParseStormEventsTimezoneStr:
         try:
-            tz = _tzhelp.tz_for_state(row.state)
-            if tz:
-                return tz.localize(row[col]).tz_convert(_pdtz_from_str(to_tz))
-            else:
-                lat, lon = row['begin_lat'], row['begin_lon']
-                tz = _tzhelp.tz_for_latlon(lat, lon)
+            state_tz = _tzhelp.tz_for_state(row.state)
+            return convert_timestamp_tz(row[col], state_tz, to_tz)
 
-                # have to do some fudging here since parsed TZ from the geopy module
-                # is DST-dependent. Our data is frozen onto one TZ.
-                hour_offset = _tzhelp.utc_offset_no_dst(tz)
-                if hour_offset < 0:
-                    return convert_timestamp_tz(row[col], 'Etc/GMT+{}'.format(-hour_offset), to_tz)
-                else:
-                    return convert_timestamp_tz(row[col], 'Etc/GMT-{}'.format(hour_offset), to_tz)
-        except KeyError as innere:
-            # FIXME: KeyError is a superclass of UnknownTimeZoneError... wtf!!! Somehow handle this.
-            print(repr(innere))
-            warnings.warn("Can't find timezone with missing lat lon or state data.")
+        except _tzhelp.MultipleStatesInTimeZoneException:
+            lat, lon = row['begin_lat'], row['begin_lon']
+            latlon_tz = _tzhelp.tz_for_latlon(lat, lon)
+            return convert_timestamp_tz(row[col], str(latlon_tz), to_tz)
 
-        raise e
     except KeyError:
         raise ValueError("Row must have `state` and `cz_timezone` column")
 
 
 def convert_timestamp_tz(timestamp, from_tz, to_tz):
-    original_tz_pd = _pdtz_from_str(from_tz)
-    new_tz_pd = _pdtz_from_str(to_tz)
+    original_tz_pd = _pytz_from_str(from_tz) if isinstance(from_tz, str) else from_tz
+    new_tz_pd = _pytz_from_str(to_tz) if isinstance(to_tz, str) else to_tz
     return pd.Timestamp(timestamp, tz=original_tz_pd).tz_convert(new_tz_pd)
 
 
@@ -77,7 +64,7 @@ def localize_timestamp_tz(timestamp, tz):
     return convert_timestamp_tz(timestamp, tz, tz)
 
 
-def _pdtz_from_str(tz_str):
+def _pytz_from_str(tz_str):
     if not tz_str or tz_str in ('UTC', 'GMT'):
         import pytz
         return pytz.timezone('GMT')
@@ -86,12 +73,16 @@ def _pdtz_from_str(tz_str):
     # handle the weird cases
     if tz_str_up in ('SCT', 'CSC'):
         # found these egregious typos
-        raise ValueError("{} is probably CST but cannot determine for sure".format(tz_str))
+        raise CannotParseStormEventsTimezoneStr("{} is probably CST but cannot determine for sure".format(tz_str))
     elif tz_str_up == 'UNK':
-        raise ValueError("UNK timezone")
+        raise CannotParseStormEventsTimezoneStr("UNK timezone")
 
     # we're safe; fallback to our usual timezone parsing logic
-    return _tzhelp.parse_tz(tz_str)
+    return _tzhelp.to_pytz(tz_str)
+
+
+class CannotParseStormEventsTimezoneStr(Exception):
+    pass
 
 
 def sync_datetime_fields(df, tz=None):
