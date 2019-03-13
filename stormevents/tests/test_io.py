@@ -23,6 +23,26 @@ def test_urls_for(req):
     assert results == expected_urls
 
 
+def test_filter_df_stormtype():
+    df = load_file(resource_path('stormevents_mixed_tzs.csv'), eventtypes=['Tornado', 'Hail'])
+    eventtypes = df[['event_type']]
+
+    assert len(eventtypes) == 13
+    assert len(eventtypes[eventtypes.event_type == 'Tornado']) == 12
+    assert len(eventtypes[eventtypes.event_type == 'Hail']) == 1
+    assert len(eventtypes[eventtypes.event_type == 'Invalid']) == 0
+
+
+def test_filter_df_state():
+    df = load_file(resource_path('stormevents_mixed_tzs.csv'), states=['Hawaii', 'Colorado'])
+    states = df[['state']]
+
+    assert len(states) == 4
+    assert len(states[states.state == 'HAWAII']) == 3
+    assert len(states[states.state == 'COLORADO']) == 1
+    assert len(states[states.state == 'NO']) == 0
+
+
 @mock.patch('shared.req.get_links', return_value=(
         'StormEvents_details-ftp_v1.0_d1990_c20170717.csv.gz',
         'StormEvents_details-ftp_v1.0_d1991_c20170717.csv.gz',
@@ -34,4 +54,19 @@ def test_load_multiple_years_storm_data(reqpatch):
                                  states=['Texas', 'Oklahoma', 'Kansas'])
 
     df_expected = load_file(resource_path('multiyear_storm_events_expected.csv'))
+    assert_frame_eq_ignoring_dtypes(df, df_expected)
+
+
+@mock.patch('wxdata.http.get_links', return_value=(
+        'StormEvents_details-ftp_v1.0_d1990_c20170717.csv.gz',
+        'StormEvents_details-ftp_v1.0_d1991_c20170717.csv.gz',
+        'StormEvents_details-ftp_v1.0_d1992_c20170717.csv.gz',
+))
+def test_load_multiple_years_storm_data_localize_to_tz(reqpatch):
+    workdir.setto(resource_path(''))
+    df = stormevents.load_events('1990-01-01', '1992-10-31', eventtypes=['Tornado'],
+                                 states=['Texas', 'Oklahoma', 'Kansas'], tz='EST')
+
+    df_expected = stormevents.load_file(resource_path('multiyear_storm_events_EST_expected.csv'),
+                                        tz_localize=True)
     assert_frame_eq_ignoring_dtypes(df, df_expected)
