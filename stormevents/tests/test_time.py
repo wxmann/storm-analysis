@@ -21,7 +21,7 @@ def test_convert_df_timezone(latlontz):
                      'cz_name', 'cz_timezone', 'begin_date_time', 'end_date_time',
                      'begin_lat', 'begin_lon', 'episode_narrative', 'event_narrative']]
 
-    expected_df = load_file(resource_path('stormevents_mixed_tzs_togmt.csv'), tz_localize=True)
+    expected_df = load_file(resource_path('stormevents_mixed_tzs_togmt.csv'))
     converted_src_df = convert_df_tz(src_df, 'GMT')
     assert_frame_eq_ignoring_dtypes(converted_src_df, expected_df)
 
@@ -40,7 +40,7 @@ def test_convert_df_timezone_multiple_times(latlontz):
                      'cz_name', 'cz_timezone', 'begin_date_time', 'end_date_time',
                      'begin_lat', 'begin_lon', 'episode_narrative', 'event_narrative']]
 
-    expected_df = load_file(resource_path('stormevents_mixed_tzs_togmt.csv'), tz_localize=True)
+    expected_df = load_file(resource_path('stormevents_mixed_tzs_togmt.csv'))
     intermed = convert_df_tz(src_df, 'CST')
     converted_src_df = convert_df_tz(intermed, 'GMT')
     assert_frame_eq_ignoring_dtypes(converted_src_df, expected_df)

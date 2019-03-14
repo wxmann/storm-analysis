@@ -1,7 +1,4 @@
-import warnings
-
 import pandas as pd
-import pytz
 
 from shared import tzhelp as _tzhelp
 
@@ -10,7 +7,7 @@ __all__ = ['convert_df_tz', 'sync_datetime_fields',
            'df_tz']
 
 
-def convert_df_tz(df, to_tz='CST', copy=True):
+def convert_df_tz(df, to_tz='CST', copy=True, localized=False):
     assert all([
         'state' in df.columns,
         'cz_timezone' in df.columns,
@@ -21,43 +18,47 @@ def convert_df_tz(df, to_tz='CST', copy=True):
 
     for col in ('begin_date_time', 'end_date_time'):
         if col in df.columns:
-            df[col] = df.apply(lambda row: convert_row_tz(row, col, to_tz), axis=1)
+            df[col] = df.apply(lambda row: convert_row_tz(row, col, to_tz, localized), axis=1)
 
     return sync_datetime_fields(df, to_tz)
 
 
-def convert_row_tz(row, col, to_tz):
+def convert_row_tz(row, col, to_tz, localized=False):
     try:
         state = row['state']
         # In older versions of storm events, `AST` and `AKST` are both logged as `AST`.
         # We can't let our tz-conversion logic believe naively it's Atlantic Standard Time
         if row['cz_timezone'] == 'AST':
             if state == 'ALASKA':
-                return convert_timestamp_tz(row[col], 'AKST-9', to_tz)
+                return convert_timestamp_tz(row[col], 'AKST-9', to_tz, localized)
             else:
                 # both Puerto Rico and Virgin Islands in AST
-                return convert_timestamp_tz(row[col], 'AST-4', to_tz)
+                return convert_timestamp_tz(row[col], 'AST-4', to_tz, localized)
 
         # moving on now...
         return convert_timestamp_tz(row[col], row['cz_timezone'], to_tz)
     except CannotParseStormEventsTimezoneStr:
         try:
             state_tz = _tzhelp.tz_for_state(row.state)
-            return convert_timestamp_tz(row[col], state_tz, to_tz)
+            return convert_timestamp_tz(row[col], state_tz, to_tz, localized)
 
         except _tzhelp.MultipleStatesInTimeZoneException:
             lat, lon = row['begin_lat'], row['begin_lon']
             latlon_tz = _tzhelp.tz_for_latlon(lat, lon)
-            return convert_timestamp_tz(row[col], str(latlon_tz), to_tz)
+            return convert_timestamp_tz(row[col], str(latlon_tz), to_tz, localized)
 
     except KeyError:
         raise ValueError("Row must have `state` and `cz_timezone` column")
 
 
-def convert_timestamp_tz(timestamp, from_tz, to_tz):
+def convert_timestamp_tz(timestamp, from_tz, to_tz, localized=False):
     original_tz_pd = _pytz_from_str(from_tz) if isinstance(from_tz, str) else from_tz
     new_tz_pd = _pytz_from_str(to_tz) if isinstance(to_tz, str) else to_tz
-    return pd.Timestamp(timestamp, tz=original_tz_pd).tz_convert(new_tz_pd)
+    converted = pd.Timestamp(timestamp, tz=original_tz_pd).tz_convert(new_tz_pd)
+
+    if not localized:
+        return converted.tz_localize(None)
+    return converted
 
 
 def localize_timestamp_tz(timestamp, tz):

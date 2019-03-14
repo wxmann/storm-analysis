@@ -67,6 +67,16 @@ def test_load_multiple_years_storm_data_localize_to_tz(reqpatch):
     df = load_events('1990-01-01', '1992-10-31', eventtypes=['Tornado'],
                                  states=['Texas', 'Oklahoma', 'Kansas'], tz='EST')
 
-    df_expected = load_file(resource_path('multiyear_storm_events_EST_expected.csv'),
-                                        tz_localize=True)
+    df_expected = load_file(resource_path('multiyear_storm_events_EST_expected.csv'))
+    assert_frame_eq_ignoring_dtypes(df, df_expected)
+
+
+@mock.patch('shared.req.get_links', return_value=(
+        'StormEvents_details-ftp_v1.0_d1991_c20170717.csv.gz',
+))
+def test_load_two_days_storm_data_localize_to_tz(reqpatch):
+    workdir.setto(resource_path(''))
+    df = load_events('1991-04-26 12:00', '1991-04-28 12:00', eventtypes=['Tornado'], tz='UTC')
+
+    df_expected = load_file(resource_path('two_day_stormevents_UTC_expected.csv'))
     assert_frame_eq_ignoring_dtypes(df, df_expected)

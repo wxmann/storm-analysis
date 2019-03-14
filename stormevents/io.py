@@ -58,19 +58,6 @@ def load_file(file, keep_data_start=None, keep_data_end=None, months=None, hours
 
     df.columns = map(str.lower, df.columns)
 
-    if tz_localize:
-        # hack to restore tz information after loading the file
-        # most times this step will not be needed. This is just for testing and dataframe comparison
-        # TODO: can we implement a localize dataframe function in the temporal processing library?
-
-        # We can't use the localize_timestamp_tz function here because pandas
-        # converts timestamps to UTC time, then makes them tz-naive. The localize function
-        # assumes the timestamps are naive but in the correct timezone.
-        df['begin_date_time'] = df.apply(
-            lambda r: convert_timestamp_tz(r.begin_date_time, 'UTC', r.cz_timezone), axis=1)
-        df['end_date_time'] = df.apply(
-            lambda r: convert_timestamp_tz(r.end_date_time, 'UTC', r.cz_timezone), axis=1)
-
     if eventtypes is not None:
         df = df[df.event_type.isin(eventtypes)]
     if states is not None:
@@ -82,21 +69,23 @@ def load_file(file, keep_data_start=None, keep_data_end=None, months=None, hours
 
     if keep_data_start and keep_data_end:
         if tz:
-            keep_data_start = localize_timestamp_tz(keep_data_start, tz)
-            keep_data_end = localize_timestamp_tz(keep_data_end, tz)
+            if tz_localize:
+                # in our comparisons, we need to localize our inputs if we also localize our dataframe
+                keep_data_start = localize_timestamp_tz(keep_data_start, tz)
+                keep_data_end = localize_timestamp_tz(keep_data_end, tz)
 
             # if we're looking at small date range, we don't have to convert the TZ for the
             # entire DF, which is expensive. But we do have to account not shifting TZ can cause
             # a +/- 1 day error.
-            start_m1days = keep_data_start - pd.Timedelta(days=1)
-            end_p1days = keep_data_end + pd.Timedelta(days=1)
+            start_m2days = keep_data_start - pd.Timedelta(hours=36)
+            end_p2days = keep_data_end + pd.Timedelta(hours=36)
 
-            df = df[(df.begin_date_time >= start_m1days) & (df.begin_date_time < end_p1days)]
-            df = convert_df_tz(df, tz, False)
+            df = df[(df.begin_date_time >= start_m2days) & (df.begin_date_time < end_p2days)]
+            df = convert_df_tz(df, tz, False, localized=tz_localize)
 
         df = df[(df.begin_date_time >= keep_data_start) & (df.begin_date_time < keep_data_end)]
     elif tz:
-        df = convert_df_tz(df, tz, False)
+        df = convert_df_tz(df, tz, False, localized=tz_localize)
 
     return df
 
@@ -108,10 +97,6 @@ def load_events(start, end, eventtypes=None, states=None, months=None,
         start = pd.Timestamp(start)
     if isinstance(end, six.string_types):
         end = pd.Timestamp(end)
-
-    if tz is not None:
-        start = localize_timestamp_tz(start, tz)
-        end = localize_timestamp_tz(end, tz)
 
     #FIXME: there is a corner case of start and end being near the turn of the year that fails.
     # We need to resolve the start and end variables to able to load both years'
