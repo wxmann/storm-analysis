@@ -9,7 +9,7 @@ import six
 
 from shared.req import get_links, DataRetrievalException
 from shared.workdir import bulksave
-from .time import convert_df_tz, localize_timestamp_tz, convert_timestamp_tz
+from .time import convert_df_tz, localize_timestamp_tz
 
 __all__ = ['load_file', 'load_events', 'load_events_year', 'export',
            'load_tornadoes', 'load_severe', 'urls_for']
