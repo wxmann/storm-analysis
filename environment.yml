@@ -9,6 +9,7 @@ dependencies:
   - beautifulsoup4
   - ipykernel
   - ipython
+  - jupyter
   - jupyter_client
   - jupyter_core
   - numpy>=1.16.2
