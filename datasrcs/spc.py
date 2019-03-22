@@ -1,5 +1,4 @@
 from datetime import datetime
-from functools import partial
 
 import pandas as pd
 
@@ -39,4 +38,10 @@ class LoadSpcException(Exception):
     pass
 
 
-filter_region = partial(filter_region_generic, cols=('slat', 'slon'))
+@pd.api.extensions.register_dataframe_accessor('spc')
+class SpcDataFrameExtension(object):
+    def __init__(self, df):
+        self._df = df
+
+    def filter_region(self, region_poly, cols=('slat', 'slon')):
+        return filter_region_generic(self._df, region_poly, cols)
