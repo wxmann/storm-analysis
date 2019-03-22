@@ -1,7 +1,9 @@
 from datetime import datetime
+from functools import partial
 
 import pandas as pd
 
+from .ops import filter_region_generic
 from shared.workdir import bulksave
 
 ALL_SEG_FILE = 'https://www.spc.noaa.gov/wcm/data/1950-{}_all_tornadoes.csv'
@@ -25,7 +27,7 @@ def _common_load(file_template, force_save):
     successes = [result for result in results if result.success]
 
     if not successes:
-        raise LoadSpcException('Cannot load tornado data from SPC datasource')
+        raise LoadSpcException
     return successes[-1].output
 
 
@@ -35,3 +37,6 @@ def _pd_read_csv(file):
 
 class LoadSpcException(Exception):
     pass
+
+
+filter_region = partial(filter_region_generic, cols=('slat', 'slon'))

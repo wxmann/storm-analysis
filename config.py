@@ -9,3 +9,7 @@ SHAPEFILE_DIR = os.path.join(RESOURCES_DIR, 'shp')
 
 def get_shp(directory, name):
     return os.path.join(SHAPEFILE_DIR, directory, name)
+
+
+def get_resource(filename):
+    return os.path.join(RESOURCES_DIR, filename)

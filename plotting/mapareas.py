@@ -1,7 +1,11 @@
 import numpy as np
+import pandas as pd
 import cartopy.crs as ccrs
 from geopy import Point
 from geopy.distance import distance
+from shapely.geometry import Polygon
+
+import config
 
 
 class Geobbox(object):
@@ -163,3 +167,11 @@ def calculate_bbox(ctr, west_east, north_south):
     lat1 = dist_northsouth.destination(start, 0).latitude
 
     return lon0, lon1, lat0, lat1
+
+
+def chase_alley():
+    bdys_df = pd.read_csv(config.get_resource('chasealley.csv'))
+    # depending on the version of shapely, we might have to manually close the polygon
+    bdys_df = bdys_df.append(bdys_df.loc[0])
+    latlon_mat = bdys_df[['lat', 'lon']].values
+    return bdys_df, Polygon(latlon_mat)
