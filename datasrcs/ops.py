@@ -1,7 +1,7 @@
-from shapely.geometry import Point, MultiPoint
-import pandas as pd
-
 from datetime import time
+
+import pandas as pd
+from shapely.geometry import Point
 
 from shared import calcs
 
@@ -28,10 +28,13 @@ class TemporalDataframe(object):
         self._datetime_col_check(col)
         self._datetime_col = col
 
-    def iter_days(self, hour=0, start=None, end=None, skip_empty_days=True, datetime_col=None):
+    def _get_datetime_col(self, datetime_col):
         datetime_col = datetime_col or self._datetime_col
         self._datetime_col_check(datetime_col)
+        return datetime_col
 
+    def iter_days(self, hour=0, start=None, end=None, skip_empty_days=True, datetime_col=None):
+        datetime_col = self._get_datetime_col(datetime_col)
         min_time = self._df[datetime_col].min()
         max_time = self._df[datetime_col].max()
         one_day = pd.Timedelta('1 day')
@@ -96,17 +99,20 @@ class GeospatialDataframe(object):
         self._latlon_col_check(cols)
         self._latlon_cols = cols
 
-    def centroid(self, latlon_cols=None):
+    def _get_latlon_col(self, latlon_cols):
         latlon_cols = latlon_cols or self._latlon_cols
         self._latlon_col_check(latlon_cols)
-        latcol, loncol = latlon_cols
+        return latlon_cols
+
+    def centroid(self, latlon_cols=None):
+        latcol, loncol = self._get_latlon_col(latlon_cols)
         ctrlat, ctrlon = calcs.spherical_centroid(self._df[latcol], self._df[loncol])
         return ctrlat, ctrlon
 
     def filter_region(self, region_poly, latlon_cols=None):
-        latlon_cols = latlon_cols or self._latlon_cols
-        self._latlon_col_check(latlon_cols)
-        return self._df[self._df.apply(lambda r: _is_in_region(r, region_poly, latlon_cols), axis=1)]
+        return self._df[
+            self._df.apply(lambda r: _is_in_region(r, region_poly, self._get_latlon_col(latlon_cols)), axis=1)
+        ]
 
 
 def _is_in_region(event, region_poly, cols):

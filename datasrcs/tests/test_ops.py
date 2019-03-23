@@ -1,6 +1,8 @@
 from collections import namedtuple
 
+from shapely.geometry import Polygon
 import pandas as pd
+import numpy as np
 import pytest
 
 from testing.helpers import resource_path
@@ -114,6 +116,22 @@ def test_find_centroid():
 
     ctrlat, ctrlon = df.geospatial.centroid()
     assert (ctrlat, ctrlon) == (pytest.approx(36.498, 1e-3), pytest.approx(-96.2876, 1e-3))
+
+def test_filter_region():
+    northern_plains_latlons = np.array([[40, -105], [40, -93], [49, -93], [49, -105]])
+    northern_plains = Polygon(northern_plains_latlons)
+
+    df = pd.read_csv(resource_path('spc_may99.csv'), parse_dates=['date_time'])
+    df.geospatial.latlon_cols = ['slat', 'slon']
+
+    tors_northern_plains = df.geospatial.filter_region(northern_plains)
+    states = tors_northern_plains.st.unique()
+    days = tors_northern_plains.dy.unique()
+    assert len(states) == 2
+    assert 'SD' in states and 'NE' in states
+    assert len(tors_northern_plains) == 19
+    assert len(days) == 2
+    assert 2 in days and 3 in days
 
 
 def _assert_iterated_dfs(df_iters, expected_data, col='date_time'):
