@@ -2,7 +2,6 @@ from datetime import datetime
 
 import pandas as pd
 
-from .ops import filter_region_generic
 from shared.workdir import bulksave
 
 ALL_SEG_FILE = 'https://www.spc.noaa.gov/wcm/data/1950-{}_all_tornadoes.csv'
@@ -22,26 +21,21 @@ def _common_load(file_template, force_save):
     attempt_years = range(this_year - 3, this_year + 1)
     urls = [file_template.format(yr) for yr in attempt_years]
 
-    results = bulksave(urls, 'spc', override_existing=force_save, postsave=_pd_read_csv)
+    results = bulksave(urls, 'spc', override_existing=force_save, postsave=load_spc_file)
     successes = [result for result in results if result.success]
 
     if not successes:
         raise LoadSpcException
-    return successes[-1].output
+
+    ret = successes[-1].output
+    ret.temporal.datetime_col = 'date_time'
+    ret.geospatial.latlon_cols = ['slat', 'slon']
+    return ret
 
 
-def _pd_read_csv(file):
+def load_spc_file(file):
     return pd.read_csv(file, parse_dates=[['date', 'time']], index_col='om')
 
 
 class LoadSpcException(Exception):
     pass
-
-
-@pd.api.extensions.register_dataframe_accessor('spc')
-class SpcDataFrameExtension(object):
-    def __init__(self, df):
-        self._df = df
-
-    def filter_region(self, region_poly, cols=('slat', 'slon')):
-        return filter_region_generic(self._df, region_poly, cols)
