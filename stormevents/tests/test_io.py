@@ -1,8 +1,10 @@
 from unittest import mock
+import pandas as pd
+import numpy as np
 
 from shared import workdir
 from testing.helpers import resource_path, assert_frame_eq_ignoring_dtypes, open_resource
-from stormevents.io import load_events, load_file, urls_for
+from stormevents.io import load_events, load_file, urls_for, export
 
 
 @mock.patch('shared.req.requests')
@@ -43,40 +45,76 @@ def test_filter_df_state():
     assert len(states[states.state == 'NO']) == 0
 
 
-@mock.patch('shared.req.get_links', return_value=(
-        'StormEvents_details-ftp_v1.0_d1990_c20170717.csv.gz',
-        'StormEvents_details-ftp_v1.0_d1991_c20170717.csv.gz',
-        'StormEvents_details-ftp_v1.0_d1992_c20170717.csv.gz',
+@mock.patch('stormevents.io.get_links', return_value=(
+        'StormEvents_details-ftp_v1.0_d1990_c20170717.csv',
+        'StormEvents_details-ftp_v1.0_d1991_c20170717.csv',
+        'StormEvents_details-ftp_v1.0_d1992_c20170717.csv'
 ))
-def test_load_multiple_years_storm_data(reqpatch):
+def test_load_multiple_years_storm_data_no_tz_conversion(reqpatch):
     workdir.setto(resource_path(''))
-    df = load_events('1990-01-01', '1992-10-31', eventtypes=['Tornado'],
-                                 states=['Texas', 'Oklahoma', 'Kansas'])
+    states = list(map(str.upper, ['Texas', 'Oklahoma', 'Kansas', 'Louisiana', 'Colorado']));
+    lower_bound = pd.Timestamp('1990-01-01')
+    upper_bound = pd.Timestamp('1992-10-31')
+    df = load_events(lower_bound, upper_bound, eventtypes=['Tornado'],
+                     states=states)
 
-    df_expected = load_file(resource_path('multiyear_storm_events_expected.csv'))
-    assert_frame_eq_ignoring_dtypes(df, df_expected)
+    assert len(df) == 48
+    assert len(df[df.year == 1990]) == 37
+    assert len(df[df.year == 1991]) == 10
+    assert len(df[df.year == 1992]) == 1
+    
+    for _, row in df.iterrows():
+        assert lower_bound <= row.begin_date_time < upper_bound
+        assert row.state in states
+        assert row.event_type == 'Tornado'
 
-
-@mock.patch('shared.req.get_links', return_value=(
-        'StormEvents_details-ftp_v1.0_d1990_c20170717.csv.gz',
-        'StormEvents_details-ftp_v1.0_d1991_c20170717.csv.gz',
-        'StormEvents_details-ftp_v1.0_d1992_c20170717.csv.gz',
+@mock.patch('stormevents.io.get_links', return_value=(
+        'StormEvents_details-ftp_v1.0_d1990_c20170717.csv',
+        'StormEvents_details-ftp_v1.0_d1991_c20170717.csv',
+        'StormEvents_details-ftp_v1.0_d1992_c20170717.csv'
 ))
-def test_load_multiple_years_storm_data_localize_to_tz(reqpatch):
+def test_load_multiple_years_storm_data_localize_to_tz(getlinks):
     workdir.setto(resource_path(''))
-    df = load_events('1990-01-01', '1992-10-31', eventtypes=['Tornado'],
-                                 states=['Texas', 'Oklahoma', 'Kansas'], tz='EST')
+    lower_bound = pd.Timestamp('1990-01-01')
+    upper_bound = pd.Timestamp('1992-10-31')
+    states = list(map(str.upper, ['Texas', 'Oklahoma', 'Kansas', 'Louisiana', 'Colorado']));
+    df = load_events(lower_bound, upper_bound, eventtypes=['Tornado'],
+                     states=states, tz='EST')
 
-    df_expected = load_file(resource_path('multiyear_storm_events_EST_expected.csv'))
-    assert_frame_eq_ignoring_dtypes(df, df_expected)
+    df_original = load_events(lower_bound, upper_bound, eventtypes=['Tornado'],
+                     states=states)
+
+    assert len(df) == 48
+    assert len(df[df.year == 1990]) == 37
+    assert len(df[df.year == 1991]) == 10
+    assert len(df[df.year == 1992]) == 1
+    
+    for _, row in df.iterrows():
+        assert lower_bound <= row.begin_date_time < upper_bound
+        assert row.state in states
+        assert row.event_type == 'Tornado'
+        assert row.cz_timezone == 'EST'
+
+    for tz, delta in zip(('CST', 'MST'), (1, 2)):
+        cst_rows = df_original.cz_timezone == tz
+        converted_times = df[cst_rows].begin_date_time
+        original_times = df_original[cst_rows].begin_date_time
+        tds = (converted_times - original_times).unique()
+        # print(converted_times)
+        # print(original_times)
+
+        assert len(tds) == 1
+        td = pd.Timedelta(tds[0])
+        hours = td.total_seconds() / 3600
+        assert hours == delta
 
 
-@mock.patch('shared.req.get_links', return_value=(
-        'StormEvents_details-ftp_v1.0_d1991_c20170717.csv.gz',
-))
-def test_load_two_days_storm_data_localize_to_tz(reqpatch):
-    workdir.setto(resource_path(''))
-    df = load_events('1991-04-26 12:00', '1991-04-28 12:00', eventtypes=['Tornado'], tz='UTC')
+# @mock.patch('shared.req.get_links', return_value=(
+#         'StormEvents_details-ftp_v1.0_d1991_c20170717.csv.gz',
+# ))
+# def test_load_two_days_storm_data_localize_to_tz(reqpatch):
+#     workdir.setto(resource_path(''))
+#     df = load_events('1991-04-26 12:00', '1991-04-28 12:00', eventtypes=['Tornado'], tz='UTC')
 
-    df_expected = load_file(resource_path('two_day_stormevents_UTC_expected.csv'))
-    assert_frame_eq_ignoring_dtypes(df, df_expected)
+#     df_expected = load_file(resource_path('two_day_stormevents_UTC_expected.csv'))
+#     assert_frame_eq_ignoring_dtypes(df, df_expected)

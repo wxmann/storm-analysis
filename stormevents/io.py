@@ -22,7 +22,7 @@ def urls_for(years):
 
 def _year_filter(years):
     years = (str(yr) for yr in years)
-    regex = r'StormEvents_details-ftp_v\d{1}\.\d{1}_d({YEARS})_c\d{8}.csv.gz'.replace(r'{YEARS}', '|'.join(years))
+    regex = r'StormEvents_details-ftp_v\d{1}\.\d{1}_d({YEARS})_c\d{8}'.replace(r'{YEARS}', '|'.join(years))
 
     def ret(link):
         return bool(re.search(regex, link))
@@ -31,7 +31,7 @@ def _year_filter(years):
 
 
 def _year_from_link(link):
-    regex = r'StormEvents_details-ftp_v\d{1}\.\d{1}_d(\d{4})_c\d{8}.csv.gz'
+    regex = r'StormEvents_details-ftp_v\d{1}\.\d{1}_d(\d{4})_c\d{8}'
     matches = re.search(regex, link)
     if matches:
         year = matches.group(1)
@@ -41,8 +41,8 @@ def _year_from_link(link):
                                      "CSV link: {}".format(link))
 
 
-def load_file(file, keep_data_start=None, keep_data_end=None, months=None, hours=None,
-              eventtypes=None, states=None, tz=None, tz_localize=False):
+def load_file(file, months=None, hours=None, eventtypes=None, states=None, 
+              tz=None, tz_localize=False):
     df = pd.read_csv(file,
                      parse_dates=['BEGIN_DATE_TIME', 'END_DATE_TIME'],
                      infer_datetime_format=True,
@@ -67,26 +67,7 @@ def load_file(file, keep_data_start=None, keep_data_end=None, months=None, hours
     if hours is not None:
         df = df[pd.to_numeric(df.begin_time.str[:2]).isin(hours)]
 
-    if keep_data_start and keep_data_end:
-        if tz:
-            if tz_localize:
-                # in our comparisons, we need to localize our inputs if we also localize our dataframe
-                keep_data_start = localize_timestamp_tz(keep_data_start, tz)
-                keep_data_end = localize_timestamp_tz(keep_data_end, tz)
-
-            # if we're looking at small date range, we don't have to convert the TZ for the
-            # entire DF, which is expensive. But we do have to account not shifting TZ can cause
-            # a +/- 1 day error.
-            start_m2days = keep_data_start - pd.Timedelta(hours=36)
-            end_p2days = keep_data_end + pd.Timedelta(hours=36)
-
-            df = df[(df.begin_date_time >= start_m2days) & (df.begin_date_time < end_p2days)]
-            df = convert_df_tz(df, tz, False, localized=tz_localize)
-
-        df = df[(df.begin_date_time >= keep_data_start) & (df.begin_date_time < keep_data_end)]
-    elif tz:
-        df = convert_df_tz(df, tz, False, localized=tz_localize)
-
+    df = convert_df_tz(df, tz, False, localized=tz_localize)
     return df
 
 
@@ -107,16 +88,9 @@ def load_events(start, end, eventtypes=None, states=None, months=None,
     year1 = start.year
     year2 = end.year
 
-    if year1 == year2:
-        links = urls_for([year1])
-        load_df_with_filter = partial(load_file, keep_data_start=start, keep_data_end=end,
-                                      eventtypes=eventtypes, states=states, months=months,
-                                      hours=hours, tz=tz)
-    else:
-        links = urls_for(range(year1, year2 + 1))
-        load_df_with_filter = partial(load_file, keep_data_start=None, keep_data_end=None,
-                                      eventtypes=eventtypes, states=states, months=months,
-                                      hours=hours, tz=tz)
+    links = urls_for(range(year1, year2 + 1))
+    load_df_with_filter = partial(load_file, eventtypes=eventtypes, states=states, months=months,
+                                  hours=hours, tz=tz)
 
     results = bulksave(links, postsave=load_df_with_filter)
     dfs = [result.output for result in results if result.success and result.output is not None]
