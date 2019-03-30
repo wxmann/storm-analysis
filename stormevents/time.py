@@ -1,13 +1,13 @@
 import pandas as pd
 
-from shared import tzhelp as _tzhelp
+from shared import tzs
 
 __all__ = ['convert_df_tz', 'sync_datetime_fields',
            'convert_timestamp_tz', 'localize_timestamp_tz',
            'df_tz']
 
 
-def convert_df_tz(df, to_tz='CST', copy=True, localized=False):
+def convert_df_tz(df, to_tz='CST', copy=True):
     assert all([
         'state' in df.columns,
         'cz_timezone' in df.columns,
@@ -16,74 +16,34 @@ def convert_df_tz(df, to_tz='CST', copy=True, localized=False):
     if copy:
         df = df.copy()
 
+    if to_tz is None:
+        raise ValueError("Must specify a non-null timezone")
+
+    to_tz = tzs.query_tz(abbrev=to_tz)
+
     for col in ('begin_date_time', 'end_date_time'):
         if col in df.columns:
-            df[col] = df.apply(lambda row: convert_row_tz(row, col, to_tz, localized), axis=1)
+            df[col] = df.apply(lambda row: convert_row(row, col, to_tz), axis=1)
 
-    return sync_datetime_fields(df, to_tz)
-
-
-def convert_row_tz(row, col, to_tz, localized=False):
-    try:
-        state = row['state']
-        # In older versions of storm events, `AST` and `AKST` are both logged as `AST`.
-        # We can't let our tz-conversion logic believe naively it's Atlantic Standard Time
-        if row['cz_timezone'] == 'AST':
-            if state == 'ALASKA':
-                return convert_timestamp_tz(row[col], 'AKST-9', to_tz, localized)
-            else:
-                # both Puerto Rico and Virgin Islands in AST
-                return convert_timestamp_tz(row[col], 'AST-4', to_tz, localized)
-
-        # moving on now...
-        return convert_timestamp_tz(row[col], row['cz_timezone'], to_tz)
-    except CannotParseStormEventsTimezoneStr:
-        try:
-            state_tz = _tzhelp.tz_for_state(row.state)
-            return convert_timestamp_tz(row[col], state_tz, to_tz, localized)
-
-        except _tzhelp.MultipleStatesInTimeZoneException:
-            lat, lon = row['begin_lat'], row['begin_lon']
-            latlon_tz = _tzhelp.tz_for_latlon(lat, lon)
-            return convert_timestamp_tz(row[col], str(latlon_tz), to_tz, localized)
-
-    except KeyError:
-        raise ValueError("Row must have `state` and `cz_timezone` column")
+    return sync_datetime_fields(df, to_tz.abbrev)
 
 
-def convert_timestamp_tz(timestamp, from_tz, to_tz, localized=False):
-    original_tz_pd = _pytz_from_str(from_tz) if isinstance(from_tz, str) else from_tz
-    new_tz_pd = _pytz_from_str(to_tz) if isinstance(to_tz, str) else to_tz
-    converted = pd.Timestamp(timestamp, tz=original_tz_pd).tz_convert(new_tz_pd)
+def convert_row(row, col, to_tz):
+    state = row['state']
+    latlon = (row['begin_lat'], row['begin_lon'])
+    # In older versions of storm events, `AST` and `AKST` are both logged as `AST`.
+    # We can't let our tz-conversion logic believe naively it's Atlantic Standard Time
+    if row['cz_timezone'] == 'AST':
+        if state == 'ALASKA':
+            from_tz = tzs.query_tz(abbrev='AKST-9')
+        else:
+            # both Puerto Rico and Virgin Islands in AST
+            from_tz = tzs.query_tz(abbrev='AST-4')
+    else:
+        from_tz = tzs.query_tz(abbrev=row['cz_timezone'], state=state, latlon=latlon)
 
-    if not localized:
-        return converted.tz_localize(None)
-    return converted
-
-
-def localize_timestamp_tz(timestamp, tz):
-    return convert_timestamp_tz(timestamp, tz, tz)
-
-
-def _pytz_from_str(tz_str):
-    if not tz_str or tz_str in ('UTC', 'GMT'):
-        import pytz
-        return pytz.timezone('GMT')
-
-    tz_str_up = tz_str.upper()
-    # handle the weird cases
-    if tz_str_up in ('SCT', 'CSC'):
-        # found these egregious typos
-        raise CannotParseStormEventsTimezoneStr("{} is probably CST but cannot determine for sure".format(tz_str))
-    elif tz_str_up == 'UNK':
-        raise CannotParseStormEventsTimezoneStr("UNK timezone")
-
-    # we're safe; fallback to our usual timezone parsing logic
-    return _tzhelp.to_pytz(tz_str)
-
-
-class CannotParseStormEventsTimezoneStr(Exception):
-    pass
+    delta_offset = to_tz.utc_offset - from_tz.utc_offset
+    return row[col] + pd.Timedelta(hours=delta_offset)
 
 
 def sync_datetime_fields(df, tz=None):

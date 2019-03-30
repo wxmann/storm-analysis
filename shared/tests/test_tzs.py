@@ -16,14 +16,15 @@ def test_get_tz_from_latlon():
 
 def test_convert_tz_to_dst():
     pst = tzs.PST
-    assert pst.todst().utc_offset == tzs.PST.utc_offset + 1
+    assert pst.todst().utc_offset == -7
     assert pst.todst().abbrev == 'PDT'
 
 def test_get_tz_from_abbrev():
     assert tzs.query_tz(abbrev='CST') == tzs.CST
     assert tzs.query_tz(abbrev='GMT') == tzs.GMT
     assert tzs.query_tz(abbrev='UTC') == tzs.GMT
-    assert tzs.query_tz(abbrev='GMT+8') == tzs.PST
+    assert tzs.query_tz(abbrev='GMT-8') == tzs.PST
+    assert tzs.query_tz(abbrev='AKST-9') == tzs.AKST
     assert tzs.query_tz(abbrev='GMT-0') == tzs.GMT
     assert tzs.query_tz(abbrev='GMT+0') == tzs.GMT
     assert tzs.query_tz(abbrev='PDT') == tzs.PDT

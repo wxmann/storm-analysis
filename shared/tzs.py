@@ -92,16 +92,17 @@ for tz in SUPPORTED_TIMEZONES:
 
     if not tz.isdst:
         if tz.utc_offset <= 0:
-            connector = '+'
+            connector = '-'
             offset = -tz.utc_offset
         else:
-            connector = '-'
+            connector = '+'
             offset = tz.utc_offset
-        _abbrev_tz_lookup['{}{}{}'.format('GMT', connector, offset)] = tz
-        _abbrev_tz_lookup['{}{}{}'.format('UTC', connector, offset)] = tz
+
+        for prefix in ('GMT', 'UTC', tz.abbrev):
+            _abbrev_tz_lookup['{}{}{}'.format(prefix, connector, offset)] = tz
 
     # support for both +0 and -0
-    _abbrev_tz_lookup['GMT-0'] = GMT
+    _abbrev_tz_lookup['GMT+0'] = GMT
     _abbrev_tz_lookup['UTC'] = GMT
 
     if not tz.isdst:
@@ -112,7 +113,7 @@ class CannotFindTimeZoneException(Exception):
     pass
 
 
-__all__ = ['tz_for_state', 'to_pytz', 'tz_for_latlon']
+__all__ = ['query_tz', 'SUPPORTED_TIMEZONES']
 
 
 def query_tz(abbrev=None, state=None, latlon=None):
@@ -122,20 +123,25 @@ def query_tz(abbrev=None, state=None, latlon=None):
     
     if abbrev is not None:
         abbrev = abbrev.upper().strip()
-        # print(_abbrev_tz_lookup)
         if abbrev in _abbrev_tz_lookup:
             return _abbrev_tz_lookup[abbrev]
+        else:
+            print(f"Could not find TZ with abbrev: {abbrev}")
     
     if state is not None:
         state = state.upper().strip()
         if state in _state_tz_lookup:
             return _state_tz_lookup[state]
+        else:
+            print(f"Could not find TZ with state: {state}")
 
     if latlon is not None:
         lat, lon = latlon
         offset = _offset_for_latlon(lat, lon)
         if offset in _offset_tz_lookup:
             return _offset_tz_lookup[offset]
+        else:
+            print(f"Could not find TZ with latlon: {latlon}")
         
     raise CannotFindTimeZoneException(
         'Cannot find timezone based on query: {}'.format(
