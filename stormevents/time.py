@@ -7,9 +7,7 @@ __all__ = ['convert_df_tz', 'sync_datetime_fields']
 
 def convert_df_tz(df, to_tz='CST', copy=True):
     assert all([
-        'state' in df.columns,
-        'cz_timezone' in df.columns,
-        'begin_date_time' in df.columns
+        col in df.columns for col in ('state', 'cz_timezone', 'begin_date_time', 'begin_lat', 'begin_lon')
     ])
     if copy:
         df = df.copy()
@@ -18,15 +16,16 @@ def convert_df_tz(df, to_tz='CST', copy=True):
         raise ValueError("Must specify a non-null timezone")
 
     to_tz = tzs.query_tz(abbrev=to_tz)
+    offsets = df.apply(lambda row: _find_tz_offset(row, to_tz), axis=1)
 
     for col in ('begin_date_time', 'end_date_time'):
         if col in df.columns:
-            df[col] = df.apply(lambda row: convert_row(row, col, to_tz), axis=1)
+            df[col] = df[col] + offsets
 
     return sync_datetime_fields(df, to_tz.abbrev)
 
 
-def convert_row(row, col, to_tz):
+def _find_tz_offset(row, to_tz):
     state = row['state']
     latlon = (row['begin_lat'], row['begin_lon'])
     # In older versions of storm events, `AST` and `AKST` are both logged as `AST`.
@@ -41,7 +40,7 @@ def convert_row(row, col, to_tz):
         from_tz = tzs.query_tz(abbrev=row['cz_timezone'], state=state, latlon=latlon)
 
     delta_offset = to_tz.utc_offset - from_tz.utc_offset
-    return row[col] + pd.Timedelta(hours=delta_offset)
+    return pd.Timedelta(hours=delta_offset)
 
 
 def sync_datetime_fields(df, tz=None):
