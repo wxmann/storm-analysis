@@ -3,16 +3,6 @@ import pytz
 
 class TimeZone(object):
     @classmethod
-    def todst(cls, inst):
-        new_abbrev = inst.abbrev.replace('S', 'D')
-        new_offset = inst.utc_offset + 1
-        new_states = set(inst.full_states)
-        if 'ARIZONA' in inst.full_states:
-            new_states.remove('ARIZONA')
-        new_inst = cls(new_abbrev, new_offset, new_states, True)
-        return new_inst
-
-    @classmethod
     def gmt(cls):
         return cls('GMT', 0, [])
 
@@ -30,25 +20,44 @@ class TimeZone(object):
             tzstr = 'Etc/GMT{}{}'.format(connector, abs(self.utc_offset))
         return pytz.timezone(tzstr)
 
+    def todst(self):
+        if self.isdst:
+            return self
+        new_abbrev = self.abbrev.replace('ST', 'DT')
+        new_offset = self.utc_offset + 1
+        new_states = set(self.full_states)
+        if 'ARIZONA' in self.full_states:
+            new_states.remove('ARIZONA')
+        return TimeZone(new_abbrev, new_offset, new_states, True)
+
+    def __eq__(self, other):
+        if self is other:
+            return True
+        return all([
+            self.abbrev == other.abbrev,
+            self.utc_offset == other.utc_offset,
+            self.isdst == other.isdst
+        ])
+
     def __repr__(self):
         return f'<tz {self.abbrev} {self.utc_offset} from GMT>'
 
 
 PST = TimeZone('PST', -8, ('WASHINGTON', 'CALIFORNIA', 'NEVADA'))
-PDT = TimeZone.todst(PST)
+PDT = PST.todst()
 
 MST = TimeZone('MST', -7, ('MONTANA', 'WYOMING', 'UTAH', 'COLORADO', 'ARIZONA', 'NEW MEXICO'))
-MDT = TimeZone.todst(MST)
+MDT = MST.todst()
 
 CST = TimeZone('CST', -6, ('OKLAHOMA', 'MINNESOTA', 'IOWA', 'WISCONSIN', 'MISSOURI', 'ARKANSAS',
                            'LOUISIANA', 'ILLINOIS', 'MISSISSIPPI', 'ALABAMA'))
-CDT = TimeZone.todst(CST)
+CDT = CST.todst()
 
 EST = TimeZone('EST', -5, ('OHIO', 'WEST VIRGINIA', 'PENNSYLVANIA', 'NEW YORK', 'VERMONT', 'NEW HAMPSHIRE',
                            'MAINE', 'MASSACHUSETTS', 'RHODE ISLAND', 'CONNECTICUT', 'NEW JERSEY', 'DELAWARE',
                            'MARYLAND', 'DISTRICT OF COLUMBIA', 'VIRGINIA', 'NORTH CAROLINA', 'SOUTH CAROLINA',
                            'GEORGIA'))
-EDT = TimeZone.todst(EST)
+EDT = EST.todst()
 
 # American Samoa, Guam, and PR/USVI do not observe DST
 SST = TimeZone('SST', -11, ('AMERICAN SAMOA',))
@@ -57,11 +66,11 @@ GST = TimeZone('GST', 10, ('GUAM',))
 
 # Note: the lack of full states is because a part of the Aleutian Islands is in HST instead of AKST
 AKST = TimeZone('AKST', -9, [])
-AKDT = TimeZone.todst(AKST)
+AKDT = AKST.todst()
 
 # Hawaii does not observe DST, but the Aleutian Islands do, so unfortunately, HDT exists.
 HST = TimeZone('HST', -10, ('HAWAII',))
-HDT = TimeZone.todst(HST)
+HDT = HST.todst()
 
 GMT = TimeZone.gmt()
 
@@ -138,49 +147,6 @@ def _offset_for_latlon(lat, lon):
     tzname = tzwhere.tzwhere().tzNameAt(lat, lon)
     # tzname is DST-dependent, we want to freeze it at a constant GMT-offset
     return pytz_tostd_offset(tzname)
-
-
-# def _find_tz(abbrev):
-#     if abbrev is None:
-#         raise UnsupportedTimeZoneException('Cannot get TZ info for `None`')
-#     tz_str = abbrev.upper().strip()
-#     try:
-#         return _timezone_map[tz_str]
-#     except KeyError:
-#         raise UnsupportedTimeZoneException("Invalid tz: {} (or offset does not match tz abbrevation)".format(tz_str))
-
-
-# def tz_for_state(state):
-#     state = state.upper().strip()
-#     try:
-#         return _state_std_tz_map[state].to_pytz()
-#     except KeyError:
-#         raise MultipleStatesInTimeZoneException
-
-
-# # try to use this sparingly, it has perf issues
-# def tz_for_latlon(lat, lon):
-#     from tzwhere import tzwhere
-#     tzname = tzwhere.tzwhere().tzNameAt(lat, lon)
-
-#     # tzname is DST-dependent, we want to freeze it at a constant GMT-offset
-#     offset = utc_offset_no_dst(tzname)
-#     if offset < 0:
-#         tzname = 'Etc/GMT+{}'.format(-offset)
-#     else:
-#         tzname = 'Etc/GMT-{}'.format(offset)
-#     return to_pytz(tzname)
-
-
-# def to_pytz(tz_str):
-#     if tz_str is None:
-#         return _find_tz(tz_str).to_pytz()
-#     try:
-#         # we're good here
-#         return pytz.timezone(tz_str)
-#     except pytz.UnknownTimeZoneError:
-#         # get it from our hard-coded list
-#         return _find_tz(tz_str).to_pytz()
 
 
 def pytz_tostd_offset(pytz_, as_of=None):

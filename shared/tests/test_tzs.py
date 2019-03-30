@@ -14,6 +14,11 @@ def test_get_tz_from_latlon():
     latlon = (37.7, -122.4)
     assert tzs.query_tz(latlon=latlon) == tzs.PST
 
+def test_convert_tz_to_dst():
+    pst = tzs.PST
+    assert pst.todst().utc_offset == tzs.PST.utc_offset + 1
+    assert pst.todst().abbrev == 'PDT'
+
 def test_get_tz_from_abbrev():
     assert tzs.query_tz(abbrev='CST') == tzs.CST
     assert tzs.query_tz(abbrev='GMT') == tzs.GMT
