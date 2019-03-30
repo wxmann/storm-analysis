@@ -4,6 +4,7 @@ from functools import partial
 import pandas as pd
 
 from shared.workdir import bulksave
+from shared.tzs import TimeZone
 
 ALL_SEG_FILE = 'https://www.spc.noaa.gov/wcm/data/1950-{}_all_tornadoes.csv'
 ALL_TOR_TRACK_FILE = 'https://www.spc.noaa.gov/wcm/data/1950-{}_actual_tornadoes.csv'
@@ -42,28 +43,30 @@ def load_spc_file(file, to_tz=None):
 
 
 def convert_spc_data_tz(df, to_tz, copy=True):
-    if not isinstance(to_tz, int):
-        raise ValueError("TZ conversion argument must be an integer")
+    if not isinstance(to_tz, (int, TimeZone)):
+        raise ValueError("TZ conversion argument must be an integer or TimeZone object")
     if copy:
         df = df.copy()
 
-    tz_diffs = df.tz - to_tz
+    if isinstance(to_tz, int):
+        tz_diffs = df.tz - to_tz
+        tz_col = to_tz
+    else:
+        tz_diffs = df.tz - _tz_to_spctz(to_tz)
+        tz_col = _tz_to_spctz(to_tz)
+
     df['date_time'] = df.date_time - pd.to_timedelta(tz_diffs, 'H')
     df['yr'] = df.date_time.dt.year
     df['mo'] = df.date_time.dt.month
     df['dy'] = df.date_time.dt.day
-    df['tz'] = to_tz
-
+    df['tz'] = tz_col
     return df
+
+
+def _tz_to_spctz(tz):
+    return 9 + tz.utc_offset
 
 
 class LoadSpcException(Exception):
     pass
-
-
-class tzs:
-    CST = 3
-    GMT = 9
-    EST = 4
-    PST = 1
-    MST = 2
+    
