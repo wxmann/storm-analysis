@@ -5,7 +5,7 @@ import pytest
 
 from shared import workdir
 from testing.helpers import resource_path, assert_frame_eq_ignoring_dtypes, open_resource
-from stormevents.io import load_events, load_file, urls_for, export, convert_df_tz
+from ..stormevents import load_events, load_file, urls_for, export, convert_df_tz
 
 
 @mock.patch('shared.req.requests')
@@ -62,7 +62,7 @@ def test_error_if_convert_to_null_tz():
         convert_df_tz(src_df, None)
 
 
-@mock.patch('stormevents.io.get_links', return_value=(
+@mock.patch('datasrcs.stormevents.get_links', return_value=(
         'StormEvents_details-ftp_v1.0_d1990_c20170717.csv',
         'StormEvents_details-ftp_v1.0_d1991_c20170717.csv',
         'StormEvents_details-ftp_v1.0_d1992_c20170717.csv'
@@ -85,7 +85,7 @@ def test_load_multiple_years_storm_data_no_tz_conversion(reqpatch):
         assert row.state in states
         assert row.event_type == 'Tornado'
 
-@mock.patch('stormevents.io.get_links', return_value=(
+@mock.patch('datasrcs.stormevents.get_links', return_value=(
         'StormEvents_details-ftp_v1.0_d1990_c20170717.csv',
         'StormEvents_details-ftp_v1.0_d1991_c20170717.csv',
         'StormEvents_details-ftp_v1.0_d1992_c20170717.csv'
@@ -125,7 +125,7 @@ def test_load_multiple_years_storm_data_localize_to_tz(getlinks):
         assert hours == delta
 
 
-@mock.patch('stormevents.io.get_links', return_value=(
+@mock.patch('datasrcs.stormevents.get_links', return_value=(
         'StormEvents_details-ftp_v1.0_d1991_c20170717.csv.gz',
 ))
 def test_load_two_days_storm_data_localize_to_tz(reqpatch):
