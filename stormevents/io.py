@@ -9,7 +9,7 @@ import six
 
 from shared.req import get_links, DataRetrievalException
 from shared.workdir import bulksave
-from .time import convert_df_tz, localize_timestamp_tz
+from .time import convert_df_tz
 
 __all__ = ['load_file', 'load_events', 'load_events_year', 'export',
            'load_tornadoes', 'load_severe', 'urls_for']
@@ -42,7 +42,7 @@ def _year_from_link(link):
 
 
 def load_file(file, months=None, hours=None, eventtypes=None, states=None, 
-              tz=None, tz_localize=False):
+              tz=None):
     df = pd.read_csv(file,
                      parse_dates=['BEGIN_DATE_TIME', 'END_DATE_TIME'],
                      infer_datetime_format=True,
@@ -67,7 +67,8 @@ def load_file(file, months=None, hours=None, eventtypes=None, states=None,
     if hours is not None:
         df = df[pd.to_numeric(df.begin_time.str[:2]).isin(hours)]
 
-    df = convert_df_tz(df, tz, False, localized=tz_localize)
+    if tz is not None:
+        df = convert_df_tz(df, tz, False)
     return df
 
 
