@@ -4,7 +4,7 @@ from functools import partial
 import pandas as pd
 
 from shared.workdir import bulksave
-from shared.tzs import TimeZone
+from shared.tzs import TimeZone, query_tz
 
 ALL_SEG_FILE = 'https://www.spc.noaa.gov/wcm/data/1950-{}_all_tornadoes.csv'
 ALL_TOR_TRACK_FILE = 'https://www.spc.noaa.gov/wcm/data/1950-{}_actual_tornadoes.csv'
@@ -27,7 +27,9 @@ def _common_load(file_template, force_save, to_tz):
     successes = [result for result in results if result.success]
 
     if not successes:
-        raise LoadSpcException
+        print(f'Cannot load SPC files: {urls}')
+        ex = sum([result.exceptions for result in results if not result.success], [])
+        raise LoadSpcException(ex[-1])
 
     ret = successes[-1].output
     ret.temporal.datetime_col = 'date_time'
@@ -43,8 +45,8 @@ def load_spc_file(file, to_tz=None):
 
 
 def convert_spc_data_tz(df, to_tz, copy=True):
-    if not isinstance(to_tz, (int, TimeZone)):
-        raise ValueError("TZ conversion argument must be an integer or TimeZone object")
+    if not isinstance(to_tz, (int, str, TimeZone)):
+        raise ValueError("TZ conversion argument must be an integer, string, or TimeZone object")
     if copy:
         df = df.copy()
 
@@ -52,6 +54,9 @@ def convert_spc_data_tz(df, to_tz, copy=True):
         tz_diffs = df.tz - to_tz
         tz_col = to_tz
     else:
+        if isinstance(to_tz, str):
+            to_tz = query_tz(abbrev=to_tz)
+
         tz_diffs = df.tz - _tz_to_spctz(to_tz)
         tz_col = _tz_to_spctz(to_tz)
 
