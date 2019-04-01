@@ -38,7 +38,7 @@ def _common_load(file_template, force_save, to_tz):
 
 
 def load_spc_file(file, to_tz=None):
-    df = pd.read_csv(file, parse_dates=[['date', 'time']], index_col='om')
+    df = pd.read_csv(file, parse_dates=[['date', 'time']], index_col=False)
     if to_tz is not None:
         df = convert_spc_data_tz(df, to_tz)
     return df
