@@ -1,5 +1,6 @@
 from collections import namedtuple
 
+from datetime import date
 from shapely.geometry import Polygon
 import pandas as pd
 import numpy as np
@@ -8,6 +9,17 @@ import pytest
 from testing.helpers import resource_path
 
 expected_results = namedtuple('expected_results', ['start', 'end', 'numrecords'])
+
+def test_get_tors_in_day():
+    df = pd.read_csv(resource_path('spc_may99.csv'), parse_dates=['date_time'])
+    df.temporal.datetime_col = 'date_time'
+
+    df_day = df.temporal.getday('1999-05-03')
+    assert len(df_day) == 71
+
+    unique_days = df_day.date_time.dt.date.unique()
+    assert len(unique_days) == 1
+    assert unique_days[0] == date(1999, 5, 3)
 
 def test_iterate_through_days():
     df = pd.read_csv(resource_path('spc_may99.csv'), parse_dates=['date_time'])
@@ -22,7 +34,6 @@ def test_iterate_through_days():
 
     actuals = df.temporal.iter_days()
     _assert_iterated_dfs(actuals, expected_data)
-
 
 def test_iterate_through_days_nonzero_hour():
     df = pd.read_csv(resource_path('spc_may99.csv'), parse_dates=['date_time'])

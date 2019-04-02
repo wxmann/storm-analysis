@@ -19,7 +19,6 @@ def test_load_spc_file_and_convert_tz():
     df2 = load_spc_file(file, to_tz=3)
     df3 = load_spc_file(file, to_tz='CST')
 
-    # hack to make columns aligned
     df_expected = pd.read_csv(resource_path('spc_mixedtzs_converted.csv'),
                               parse_dates=['date_time'],
                               index_col=False)

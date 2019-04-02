@@ -33,6 +33,12 @@ class TemporalDataframe(object):
         self._datetime_col_check(datetime_col)
         return datetime_col
 
+    def getday(self, date_, datetime_col=None):
+        datetime_col = self._get_datetime_col(datetime_col)
+        min_time = pd.Timestamp(date_)
+        max_time = min_time + pd.Timedelta('1 day')
+        return self._df[(self._df[datetime_col] >= min_time) & (self._df[datetime_col] < max_time)]
+
     def iter_days(self, hour=0, start=None, end=None, skip_empty_days=True, datetime_col=None):
         datetime_col = self._get_datetime_col(datetime_col)
         min_time = self._df[datetime_col].min()
