@@ -27,27 +27,28 @@ class Daily4X(object):
     def _get_times(self, when):
         if isinstance(when, str):
             return [pd.Timestamp(when)]
-
         try:
             iter(when)
         except TypeError:
             times = [pd.Timestamp(when)]
         else:
             times = [pd.Timestamp(ts) for ts in when]
-
         return times
+
+    def _construct_year_map(self, datetimes):
+        year_map = {}
+        for time_ in datetimes:
+            year = time_.year
+            if year not in year_map:
+                year_map[year] = []
+            year_map[year].append(time_)
+        return year_map
 
     def hgt(self, when, level=None):
         if isinstance(when, int):
             return _dataset_for('ncep.reanalysis/pressure', f'hgt.{when}')
 
-        year_map = {}
-        for time_ in self._get_times(when):
-            year = time_.year
-            if year not in year_map:
-                year_map[year] = []
-            year_map[year].append(time_)
-
+        year_map = self._construct_year_map(self._get_times(when))
         concat_datasets = []
 
         for year in year_map:
@@ -65,30 +66,23 @@ class Daily4X(object):
         if when is None:
             return ds_lev_filtered
 
+        year_map = self._construct_year_map(self._get_times(when))
         concat_datasets = []
 
         # this is required because the ltm files are loaded with year=0, and hence loaded as cftimes
         # rather than typical np times.
         orig_times = ds_lev_filtered.time.values
 
-        for time_ in self._get_times(when):
-            # hack: reconstruct the time series for each year
-            # TODO: optimize this to do it for only unique years
-            newtimes = np.array([pd.Timestamp(year=time_.year,
+        for year in year_map:
+            newtimes = np.array([pd.Timestamp(year=year,
                                               month=t.month,
                                               day=t.day,
                                               hour=t.hour,
                                               minute=t.minute) for t in orig_times])
             ds_lev_filtered['time'] = newtimes
-            concat_datasets.append(ds_lev_filtered.sel(time=time_))
+            concat_datasets.append(ds_lev_filtered.sel(time=year_map[year]))
 
         return xr.concat(concat_datasets, dim='time')
-
-        # when = pd.Timestamp(when)
-        # month, day, hour = when.month, when.day, when.hour
-        # dt = ds.time.dt
-        # dt_query = (dt.month == month) & (dt.day == day) & (dt.hour == hour)
-        # return ds_lev_filtered.sel(time=dt_query)
 
 
 daily4x = Daily4X()
