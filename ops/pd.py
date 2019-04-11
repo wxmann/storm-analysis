@@ -4,6 +4,7 @@ import pandas as pd
 from shapely.geometry import Point
 
 from shared import calcs
+from .op_shared import LatLonAccessors
 
 
 @pd.api.extensions.register_dataframe_accessor('temporal')
@@ -80,44 +81,27 @@ def iter_intervals(df, col, interval_index, skip_empty_buckets=True):
 
 
 @pd.api.extensions.register_dataframe_accessor('geospatial')
-class GeospatialDataframe(object):
+class GeospatialDataframe(LatLonAccessors):
     def __init__(self, df):
+        super().__init__()
         self._df = df
-        self._latlon_cols = []
 
-    def _latlon_col_check(self, cols, check_columns_valid=True):
-        if not cols:
-            raise ValueError("Missing or null lat lon argument")
-        if len(cols) != 2:
-            raise ValueError("Must provide exactly two columns corresponding to lat and lon")
+    def _latlon_accessor_check(self, accessors, check_columns_valid=True):
+        super(GeospatialDataframe, self)._latlon_accessor_check(accessors)
 
         if check_columns_valid:
-            for col in cols:
+            for col in accessors:
                 if col not in self._df.columns:
                     raise ValueError("Invalid column not in dataframe: {}".format(col))
 
-    @property
-    def latlon_cols(self):
-        return list(self._latlon_cols)
-
-    @latlon_cols.setter
-    def latlon_cols(self, cols):
-        self._latlon_col_check(cols)
-        self._latlon_cols = cols
-
-    def _get_latlon_col(self, latlon_cols):
-        latlon_cols = latlon_cols or self._latlon_cols
-        self._latlon_col_check(latlon_cols)
-        return latlon_cols
-
     def centroid(self, latlon_cols=None):
-        latcol, loncol = self._get_latlon_col(latlon_cols)
+        latcol, loncol = self._get_latlon_accessors(latlon_cols)
         ctrlat, ctrlon = calcs.spherical_centroid(self._df[latcol], self._df[loncol])
         return ctrlat, ctrlon
 
     def filter_region(self, region_poly, latlon_cols=None):
         return self._df[
-            self._df.apply(lambda r: _is_in_region(r, region_poly, self._get_latlon_col(latlon_cols)), axis=1)
+            self._df.apply(lambda r: _is_in_region(r, region_poly, self._get_latlon_accessors(latlon_cols)), axis=1)
         ]
 
 

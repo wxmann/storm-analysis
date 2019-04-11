@@ -33,7 +33,7 @@ def _common_load(file_template, force_save, to_tz):
 
     ret = successes[-1].output
     ret.temporal.datetime_col = 'date_time'
-    ret.geospatial.latlon_cols = ['slat', 'slon']
+    ret.geospatial.latlon_accessors = ['slat', 'slon']
     return ret
 
 

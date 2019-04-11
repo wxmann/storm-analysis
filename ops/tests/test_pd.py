@@ -123,7 +123,7 @@ def test_iterate_days_with_custom_datetime_col():
 
 def test_find_centroid():
     df = pd.read_csv(resource_path('spc_may99.csv'), parse_dates=['date_time'])
-    df.geospatial.latlon_cols = ['slat', 'slon']
+    df.geospatial.latlon_accessors = ['slat', 'slon']
 
     ctrlat, ctrlon = df.geospatial.centroid()
     assert (ctrlat, ctrlon) == (pytest.approx(36.498, 1e-3), pytest.approx(-96.2876, 1e-3))
@@ -133,7 +133,7 @@ def test_filter_region():
     northern_plains = Polygon(northern_plains_latlons)
 
     df = pd.read_csv(resource_path('spc_may99.csv'), parse_dates=['date_time'])
-    df.geospatial.latlon_cols = ['slat', 'slon']
+    df.geospatial.latlon_accessors = ['slat', 'slon']
 
     tors_northern_plains = df.geospatial.filter_region(northern_plains)
     states = tors_northern_plains.st.unique()
