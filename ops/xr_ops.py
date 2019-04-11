@@ -23,6 +23,7 @@ class GeospatialDataset(LatLonAccessors):
         londata = shifted[londim].values
         londata_shifted = np.where((londata >= 0) & (londata <= 180), londata, -360 + londata)
         shifted[londim] = londata_shifted
+        shifted = shifted.sortby(londim)
         if self._latlon_accessors:
             shifted.geospatial.latlon_accessors = self._latlon_accessors
         return shifted

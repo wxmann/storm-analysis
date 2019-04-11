@@ -1,2 +1,2 @@
-from .pd import *
-from .xr import *
+from .pd_ops import *
+from .xr_ops import *

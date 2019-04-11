@@ -1,4 +1,5 @@
 import xarray as xr
+import numpy as np
 
 from testing.helpers import resource_path
 
@@ -11,6 +12,7 @@ def test_shiftgrid_dataset():
     assert ds.lon.values.min() == 0.0
 
     assert shifted.lon.shape == ds.lon.shape
+    assert (np.diff(shifted.lon) >= 0).all()
 
 
 def test_get_domain():
@@ -27,5 +29,6 @@ def test_get_domain():
     assert ((lons >= lon0) & (lons <= lon1)).all()
     assert lats.shape[0] == 37
     assert lons.shape[0] == 41
+
 
 
