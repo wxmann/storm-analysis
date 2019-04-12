@@ -4,7 +4,7 @@ import pandas as pd
 from shapely.geometry import Point
 
 from shared import calcs
-from .op_shared import LatLonAccessors
+from .op_shared import LatLonAware
 
 
 @pd.api.extensions.register_dataframe_accessor('temporal')
@@ -81,7 +81,7 @@ def iter_intervals(df, col, interval_index, skip_empty_buckets=True):
 
 
 @pd.api.extensions.register_dataframe_accessor('geospatial')
-class GeospatialDataframe(LatLonAccessors):
+class GeospatialDataframe(LatLonAware):
     def __init__(self, df):
         super().__init__()
         self._df = df

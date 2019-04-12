@@ -1,11 +1,20 @@
+import pytest
 import xarray as xr
 import numpy as np
 
+import ops
 from testing.helpers import resource_path
 
-def test_shiftgrid_dataset():
+@pytest.fixture(scope='module')
+def set_accessors():
+    ops.set_latlon_accessor(['lat', 'lon'])
+    yield
+    ops.unset_latlon_accessor()
+
+
+def test_shiftgrid_dataset(set_accessors):
     ds = xr.open_dataset(resource_path('h5_910427.nc'))
-    shifted = ds.geospatial.shiftgrid(latlon_dims=['lat', 'lon'])
+    shifted = ds.geospatial.shiftgrid()
 
     assert shifted.lon.values.max() == 180.0
     assert shifted.lon.values.min() == -177.5
@@ -15,11 +24,10 @@ def test_shiftgrid_dataset():
     assert (np.diff(shifted.lon) >= 0).all()
 
 
-def test_get_domain():
+def test_get_domain(set_accessors):
     lon0, lon1 = 100, 200
     lat0, lat1 = 0, 90
     ds = xr.open_dataset(resource_path('h5_910427.nc'))
-    ds.geospatial.latlon_accessors = ('lat', 'lon')
     shifted = ds.geospatial.domain(lon0, lon1, lat0, lat1)
 
     lats = shifted.lat.values

@@ -1,10 +1,10 @@
 import xarray as xr
 import numpy as np
 
-from .op_shared import LatLonAccessors
+from .op_shared import LatLonAware
 
 @xr.register_dataset_accessor('geospatial')
-class GeospatialDataset(LatLonAccessors):
+class GeospatialDataset(LatLonAware):
     def __init__(self, ds):
         super().__init__()
         self._ds = ds
@@ -21,11 +21,9 @@ class GeospatialDataset(LatLonAccessors):
         _, londim = self._get_latlon_accessors(latlon_dims)
         shifted = self._ds.copy()
         londata = shifted[londim].values
-        londata_shifted = np.where((londata >= 0) & (londata <= 180), londata, -360 + londata)
+        londata_shifted = np.where((londata >= -180) & (londata <= 180), londata, -360 + londata)
         shifted[londim] = londata_shifted
         shifted = shifted.sortby(londim)
-        if self._latlon_accessors:
-            shifted.geospatial.latlon_accessors = self._latlon_accessors
         return shifted
 
     def domain(self, lon0, lon1, lat0, lat1, latlon_dims=None, descending_lats=True):
