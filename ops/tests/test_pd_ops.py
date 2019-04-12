@@ -14,12 +14,13 @@ expected_results = namedtuple('expected_results', ['start', 'end', 'numrecords']
 @pytest.fixture(scope='module')
 def set_accessors():
     ops.set_latlon_accessor(['slat', 'slon'])
+    ops.set_time_accessor('date_time')
     yield
     ops.unset_latlon_accessor()
+    ops.unset_time_accessor()
 
-def test_get_tors_in_day():
+def test_get_tors_in_day(set_accessors):
     df = pd.read_csv(resource_path('spc_may99.csv'), parse_dates=['date_time'])
-    df.temporal.datetime_col = 'date_time'
 
     df_day = df.temporal.getday('1999-05-03')
     assert len(df_day) == 71
@@ -28,9 +29,8 @@ def test_get_tors_in_day():
     assert len(unique_days) == 1
     assert unique_days[0] == date(1999, 5, 3)
 
-def test_iterate_through_days():
+def test_iterate_through_days(set_accessors):
     df = pd.read_csv(resource_path('spc_may99.csv'), parse_dates=['date_time'])
-    df.temporal.datetime_col = 'date_time'
 
     expected_data = [
         expected_results(start='1999-05-02', end='1999-05-03', numrecords=10),
@@ -42,9 +42,8 @@ def test_iterate_through_days():
     actuals = df.temporal.iter_days()
     _assert_iterated_dfs(actuals, expected_data)
 
-def test_iterate_through_days_nonzero_hour():
+def test_iterate_through_days_nonzero_hour(set_accessors):
     df = pd.read_csv(resource_path('spc_may99.csv'), parse_dates=['date_time'])
-    df.temporal.datetime_col = 'date_time'
 
     expected_data = [
         expected_results(start='1999-05-01 15:00', end='1999-05-02 15:00', numrecords=2),
@@ -57,9 +56,8 @@ def test_iterate_through_days_nonzero_hour():
     actuals = df.temporal.iter_days(hour=15)
     _assert_iterated_dfs(actuals, expected_data)
 
-def test_iterate_through_days_start_and_end():
+def test_iterate_through_days_start_and_end(set_accessors):
     df = pd.read_csv(resource_path('spc_may99.csv'), parse_dates=['date_time'])
-    df.temporal.datetime_col = 'date_time'
 
     expected_data = [
         expected_results(start='1999-05-03', end='1999-05-04', numrecords=71),
@@ -69,9 +67,8 @@ def test_iterate_through_days_start_and_end():
     actuals = df.temporal.iter_days(start='1999-05-03', end='1999-05-05')
     _assert_iterated_dfs(actuals, expected_data)
 
-def test_iterate_through_days_start_and_end_nonzero_hour():
+def test_iterate_through_days_start_and_end_nonzero_hour(set_accessors):
     df = pd.read_csv(resource_path('spc_may99.csv'), parse_dates=['date_time'])
-    df.temporal.datetime_col = 'date_time'
 
     expected_data = [
         expected_results(start='1999-05-03 15:00', end='1999-05-04 15:00', numrecords=96),
@@ -83,16 +80,12 @@ def test_iterate_through_days_start_and_end_nonzero_hour():
 
 def test_raise_if_set_invalid_column():
     df = pd.read_csv(resource_path('spc_may99.csv'), parse_dates=['date_time'])
-    with pytest.raises(ValueError, match='Invalid column not in dataframe: invalid_col'):
-        df.temporal.datetime_col = 'invalid_col'
-    with pytest.raises(ValueError, match='Missing or null date argument'):
-        df.temporal.datetime_col = ''
+
     with pytest.raises(ValueError, match='Invalid column not in dataframe: invalid_col'):
         df.temporal.iter_days(datetime_col='invalid_col')
 
-def test_skip_empty_days_if_skip_empty_true():
+def test_skip_empty_days_if_skip_empty_true(set_accessors):
     df = pd.read_csv(resource_path('spc_may99.csv'), parse_dates=['date_time'])
-    df.temporal.datetime_col = 'date_time'
 
     expected_data = [
         expected_results(start='1999-05-05', end='1999-05-06', numrecords=16)
@@ -101,9 +94,8 @@ def test_skip_empty_days_if_skip_empty_true():
     actuals = df.temporal.iter_days(start='1999-05-05', end='1999-05-10')
     _assert_iterated_dfs(actuals, expected_data)
 
-def test_not_skip_empty_days_if_skip_empty_false():
+def test_not_skip_empty_days_if_skip_empty_false(set_accessors):
     df = pd.read_csv(resource_path('spc_may99.csv'), parse_dates=['date_time'])
-    df.temporal.datetime_col = 'date_time'
 
     expected_data = [
         expected_results(start='1999-05-05', end='1999-05-06', numrecords=16),
@@ -113,10 +105,9 @@ def test_not_skip_empty_days_if_skip_empty_false():
     actuals = df.temporal.iter_days(start='1999-05-05', end='1999-05-07', skip_empty_days=False)
     _assert_iterated_dfs(actuals, expected_data)
 
-def test_iterate_days_with_custom_datetime_col():
+def test_iterate_days_with_custom_datetime_col(set_accessors):
     df = pd.read_csv(resource_path('spc_may99.csv'), parse_dates=['date_time'])
     df['datep1'] = df.date_time + pd.Timedelta('1 day')
-    df.temporal.datetime_col = 'date_time'
 
     expected_data = [
         expected_results(start='1999-05-03', end='1999-05-04', numrecords=10),

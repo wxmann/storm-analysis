@@ -3,6 +3,7 @@ from functools import partial
 
 import pandas as pd
 
+from ops import update_accessors
 from shared.workdir import bulksave
 from shared.tzs import TimeZone, query_tz
 
@@ -18,6 +19,7 @@ def load_full_tors(force_save=False, to_tz=None):
     return _common_load(ALL_TOR_TRACK_FILE, force_save, to_tz)
 
 
+@update_accessors(latlon=['slat', 'slon'], datetime='date_time')
 def _common_load(file_template, force_save, to_tz):
     this_year = datetime.now().year
     attempt_years = range(this_year - 3, this_year + 1)
@@ -32,8 +34,6 @@ def _common_load(file_template, force_save, to_tz):
         raise LoadSpcException(ex[-1])
 
     ret = successes[-1].output
-    ret.temporal.datetime_col = 'date_time'
-    ret.geospatial.latlon_accessors = ['slat', 'slon']
     return ret
 
 

@@ -4,6 +4,8 @@ import xarray as xr
 import pandas as pd
 import numpy as np
 
+from ops import update_accessors
+
 
 @lru_cache()
 def _dataset_for(folder, file):
@@ -44,6 +46,7 @@ class Daily4X(object):
             year_map[year].append(time_)
         return year_map
 
+    @update_accessors(latlon=['lat', 'lon'])
     def hgt(self, when, level=None):
         if isinstance(when, int):
             return _dataset_for('ncep.reanalysis/pressure', f'hgt.{when}')
@@ -59,6 +62,7 @@ class Daily4X(object):
 
         return xr.concat(concat_datasets, dim='time')
 
+    @update_accessors(latlon=['lat', 'lon'])
     def hgt_ltm(self, when=None, level=None):
         ds = _dataset_for('ncep.reanalysis.derived/pressure', 'hgt.4Xday.1981-2010.ltm')
         ds_lev_filtered = _filter_dataset_for(ds, level=level, when=None)

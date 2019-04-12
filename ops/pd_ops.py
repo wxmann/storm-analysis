@@ -3,6 +3,7 @@ from datetime import time
 import pandas as pd
 from shapely.geometry import Point
 
+import ops
 from shared import calcs
 from .op_shared import LatLonAware
 
@@ -11,7 +12,6 @@ from .op_shared import LatLonAware
 class TemporalDataframe(object):
     def __init__(self, df):
         self._df = df
-        self._datetime_col = None
 
     def _datetime_col_check(self, col, check_column_valid=True):
         if not col:
@@ -20,17 +20,8 @@ class TemporalDataframe(object):
             if col not in self._df.columns:
                 raise ValueError("Invalid column not in dataframe: {}".format(col))
 
-    @property
-    def datetime_col(self):
-        return self._datetime_col
-
-    @datetime_col.setter
-    def datetime_col(self, col):
-        self._datetime_col_check(col)
-        self._datetime_col = col
-
     def _get_datetime_col(self, datetime_col):
-        datetime_col = datetime_col or self._datetime_col
+        datetime_col = datetime_col or ops.get_time_accessor()
         self._datetime_col_check(datetime_col)
         return datetime_col
 
