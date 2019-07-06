@@ -88,5 +88,9 @@ class Daily4X(object):
 
         return xr.concat(concat_datasets, dim='time')
 
+    @update_accessors(latlon=['lat', 'lon'])
+    def hgt_anom(self, when, level=None):
+        return self.hgt(when, level) - self.hgt_ltm(when, level)
+
 
 daily4x = Daily4X()

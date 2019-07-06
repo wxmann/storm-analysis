@@ -5,6 +5,8 @@ import config
 
 CHASE_ALLEY = config.get_resource('chasealley.csv')
 
+SOUTH_CHASE_ALLEY = config.get_resource('south_chasealley.csv')
+
 CORE_PLAINS = config.get_resource('coreplains.csv')
 
 
