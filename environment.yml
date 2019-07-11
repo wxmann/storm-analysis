@@ -27,5 +27,6 @@ dependencies:
   - pynio
   - cfgrib
   - netCDF4
+  - eofs>=1.4.0
   - pip:
     - tzwhere
