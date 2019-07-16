@@ -28,5 +28,6 @@ dependencies:
   - cfgrib
   - netCDF4
   - eofs>=1.4.0
+  - multiprocess>=0.70.8
   - pip:
     - tzwhere
