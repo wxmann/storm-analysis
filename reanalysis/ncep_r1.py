@@ -22,6 +22,9 @@ def _filter_dataset_for(ds, level, when):
     return ds.sel(**kw)
 
 
+latlon_accessor_update = update_accessors(latlon=['lat', 'lon'])
+
+
 class Daily4X(object):
     def __init__(self):
         pass
@@ -46,7 +49,7 @@ class Daily4X(object):
             year_map[year].append(time_)
         return year_map
 
-    @update_accessors(latlon=['lat', 'lon'])
+    @latlon_accessor_update
     def hgt(self, when, level=None):
         if isinstance(when, int):
             return _dataset_for('ncep.reanalysis/pressure', f'hgt.{when}')
@@ -62,7 +65,7 @@ class Daily4X(object):
 
         return xr.concat(concat_datasets, dim='time')
 
-    @update_accessors(latlon=['lat', 'lon'])
+    @latlon_accessor_update
     def hgt_ltm(self, when=None, level=None):
         ds = _dataset_for('ncep.reanalysis.derived/pressure', 'hgt.4Xday.1981-2010.ltm')
         ds_lev_filtered = _filter_dataset_for(ds, level=level, when=None)
@@ -88,9 +91,24 @@ class Daily4X(object):
 
         return xr.concat(concat_datasets, dim='time')
 
-    @update_accessors(latlon=['lat', 'lon'])
     def hgt_anom(self, when, level=None):
         return self.hgt(when, level) - self.hgt_ltm(when, level)
+    
+    @latlon_accessor_update
+    def mslp(self, when=None):
+        if isinstance(when, int):
+            return _dataset_for('ncep.reanalysis/surface', f'slp.{when}')
+
+        year_map = self._construct_year_map(self._get_times(when))
+        concat_datasets = []
+
+        for year in year_map:
+            ds = _dataset_for('ncep.reanalysis/surface', f'slp.{year}')
+            datetimes = year_map[year]
+            filtered = _filter_dataset_for(ds, level=None, when=datetimes)
+            concat_datasets.append(filtered)
+
+        return xr.concat(concat_datasets, dim='time')
 
 
 daily4x = Daily4X()
