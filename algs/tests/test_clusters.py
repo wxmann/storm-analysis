@@ -5,7 +5,8 @@ import pandas as pd
 from datasrcs import stormevents
 from shared.tzs import query_tz
 from testing.helpers import resource_path
-from ..clusters import assert_clusters_equal, st_clusters, Cluster, NOISE_LABEL
+from ..clusters import st_clusters
+from algs.cluster_api import NOISE_LABEL, Cluster, assert_clusters_equal
 
 
 def test_find_st_clusters():

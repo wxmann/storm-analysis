@@ -1,12 +1,12 @@
 import pandas as pd
 import numpy as np
 
-@pd.api.extensions.register_dataframe_accessor('stsvr')
-class SevereWxEventsDataframe(object):
+@pd.api.extensions.register_dataframe_accessor('stevent_plot')
+class StormEventsPlot(object):
     def __init__(self, df):
         self._df = df
 
-    def plot_tornadoes(self, cartopymap, color='gray', shadow=False, **kwargs):
+    def tornadoes(self, cartopymap, color='gray', shadow=False, **kwargs):
         for _, event in self._df.iterrows():
             if event.event_type == 'Tornado':
                 pt1 = [event.begin_lat, event.begin_lon]
