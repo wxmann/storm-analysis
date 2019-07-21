@@ -10,7 +10,6 @@ NOISE_LABEL = -1
 
 
 class ClusterGroup(object):
-
     @classmethod
     def empty(cls):
         return cls({})
@@ -56,9 +55,8 @@ class ClusterGroup(object):
     def noise(self):
         return self._cluster_dict.get(NOISE_LABEL, Cluster._empty_cluster())
 
-    @property
-    def plot(self):
-        return ClusterGroupPlotter(self)
+    def plotter(self, *args, **kwargs):
+        return ClusterGroupPlotter(self, *args, **kwargs)
 
 
 class Cluster(object):
@@ -210,37 +208,53 @@ def assert_clusters_equal(clust1, clust2):
 
 
 class ClusterGroupPlotter(object):
-    def __init__(self, cluster_group):
+    def __init__(self, cluster_group, bgmap, colors,
+                 plot_noise=True, noise_color='gray', tz='CST'):
         self._cluster_group = cluster_group
         self._grouplen = len(cluster_group)
+        self._bgmap = bgmap
+        self._colors = colors
+        self._noise_color = noise_color if plot_noise else None
+        self._plot_noise = plot_noise
+        self._tz = tz
 
-    def tornadoes(self, cartopymap, colors,
-                  plot_noise=True, noise_color='gray',
-                  linewidth=2, shadow=True,
-                  legend=False, tz='CST', legend_text=None):
-
+    def _get_colors(self, colors=None):
+        colors = colors or self._colors
         if isinstance(colors, str):
-            colors = sample_colors(self._grouplen, colors)
-
+            return sample_colors(self._grouplen, colors)
         if isinstance(colors, (list, tuple)):
-            colors = cycle(colors)
+            return cycle(colors)
+        return colors
 
-        if legend:
-            legend = LegendBuilder(ax=cartopymap.ax)
-
+    def tornadoes(self, linewidth=2, shadow=True):
+        colors = self._get_colors()
         for clust, color in zip(self._cluster_group.clusters, colors):
-            clust.events.stevent_plot.tornadoes(cartopymap, color=color,
+            clust.events.stevent_plot.tornadoes(self._bgmap, color=color,
                                                 linewidth=linewidth, shadow=shadow)
-
-            if legend:
-                legend.append(color, clust.describe_tors(tz=tz, info=legend_text))
-
-        if plot_noise:
+        if self._plot_noise:
             noise = self._cluster_group.noise
-            noise.events.stevent_plot.tornadoes(cartopymap, color=noise_color,
+            noise.events.stevent_plot.tornadoes(self._bgmap, color=self._noise_color,
                                               linewidth=linewidth, shadow=shadow)
 
-            if legend:
-                legend.append(noise_color, noise.describe_tors(tz=tz, info=legend_text))
+    def hail(self, marker='+', markersize=2, shadow=False, colors=None):
+        colors = self._get_colors(colors)
+        for clust, color in zip(self._cluster_group.clusters, colors):
+            clust.events.stevent_plot.hail(self._bgmap, color=color,
+                                           marker=marker, markersize=markersize, shadow=shadow)
+        if self._plot_noise:
+            noise = self._cluster_group.noise
+            noise.events.stevent_plot.hail(self._bgmap, color=self._noise_color,
+                                           marker=marker, markersize=markersize, shadow=shadow)
 
-        legend and legend.plot_legend()
+    def legend(self, info=None):
+        colors = self._get_colors()
+        legend = LegendBuilder(ax=self._bgmap.ax)
+
+        for clust, color in zip(self._cluster_group.clusters, colors):
+            legend.append(color, clust.describe_tors(tz=self._tz, info=info))
+
+        if self._plot_noise:
+            noise = self._cluster_group.noise
+            legend.append(self._noise_color, noise.describe_tors(tz=self._tz, info=info))
+
+        legend.plot_legend()

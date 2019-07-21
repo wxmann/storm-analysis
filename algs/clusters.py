@@ -25,18 +25,16 @@ def st_clusters(events, eps_km, eps_min, min_samples, algorithm=None):
         if points.empty:
             raise ValueError('Cannot cluster empty events')
 
-
         pairwise_distance_input = points[['lat', 'lon']]
         pairwise_distance_input['timestamp_sec'] = points.timestamp.astype(np.int64) / 10 ** 9
         binary_dist_metric = partial(_boolean_distance, eps_km=eps_km, eps_min=eps_min)
         n_jobs = 1 if len(points) < 100 else -1
 
-        similarity = pairwise_distances(pairwise_distance_input,
-                                        metric=binary_dist_metric,
-                                        n_jobs=n_jobs)
+        binary_dists = pairwise_distances(pairwise_distance_input,
+                                          metric=binary_dist_metric, n_jobs=n_jobs)
 
         db = DBSCAN(eps=0.5, metric='precomputed', min_samples=min_samples)
-        cluster_labels = db.fit_predict(similarity)
+        cluster_labels = db.fit_predict(binary_dists)
 
         points['cluster'] = cluster_labels
         cluster_dict = {label: Cluster(label, points[points.cluster == label], events)

@@ -3,7 +3,7 @@ import cartopy.crs as ccrs
 
 class CartopyMapPlotter(object):
     def __init__(self, cartopymap):
-        self.bgmap = cartopymap
+        self._bgmap = cartopymap
 
     def lines(self, latlons, color, shadow=False, **kwargs):
         if not latlons.any():
@@ -31,5 +31,19 @@ class CartopyMapPlotter(object):
 
                 use_kw['path_effects'] = [shadow_effect, path_effects.Normal()]
 
-            self.bgmap.ax.plot(latlons[:, 1], latlons[:, 0],
-                               color=color, transform=ccrs.PlateCarree(), **use_kw)
+            self._bgmap.ax.plot(latlons[:, 1], latlons[:, 0],
+                                color=color, transform=ccrs.PlateCarree(), **use_kw)
+
+    def points(self, latlons, color='k', marker='o', markersize=2, shadow=False, **kwargs):
+        lons = latlons[:, 1]
+        lats = latlons[:, 0]
+
+        kw = kwargs.copy()
+        if shadow:
+            # TODO: fix breaking shadow effects
+            shadow_kw = dict(offset=(0.5, -0.5), alpha=0.6)
+            shadow_effect = path_effects.SimplePatchShadow(**shadow_kw)
+            kw['path_effects'] = [shadow_effect, path_effects.Normal()]
+
+        self._bgmap.ax.scatter(lons, lats, marker=marker, s=markersize,
+                            transform=ccrs.PlateCarree(), facecolor=color, **kw)
