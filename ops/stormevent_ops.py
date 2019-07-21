@@ -1,6 +1,8 @@
 import pandas as pd
 import numpy as np
 
+from algs.corrections import correct_tornado_times
+
 @pd.api.extensions.register_dataframe_accessor('stevent_plot')
 class StormEventsPlot(object):
     def __init__(self, df):
@@ -20,3 +22,31 @@ class StormEventsPlot(object):
                     arr = np.array([pt1, pt2])
 
                 cartopymap.plot.lines(arr, color, shadow=shadow, **kwargs)
+
+
+@pd.api.extensions.register_dataframe_accessor('stevent_tor')
+class StormEventsTorOps(object):
+    def __init__(self, df):
+        self._df = df
+
+    def longevity(self):
+        return self._df.end_date_time - self._df.begin_date_time
+
+    def ef(self):
+        frating = self._df.tor_f_scale.str.replace(r'\D', '')
+        return pd.to_numeric(frating, errors='coerce')
+
+    def speed_mph(self, floor_longevity=None):
+        if floor_longevity is None:
+            floor_longevity = pd.Timedelta(seconds=30)
+
+        longevities = self.longevity()
+        longevities[longevities < floor_longevity] = np.nan
+        longevities = pd.to_timedelta(longevities)
+        longevities /= pd.Timedelta('1 hour')
+        path_lens = self._df['tor_length']
+
+        return path_lens / longevities
+
+    def correct_tornado_times(self, copy=True):
+        return correct_tornado_times(self._df, copy)

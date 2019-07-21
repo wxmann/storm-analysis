@@ -4,6 +4,7 @@ import pandas as pd
 from pandas.util.testing import assert_frame_equal
 
 from plotting.utils import sample_colors
+from plotting.widgets import LegendBuilder
 
 NOISE_LABEL = -1
 
@@ -120,62 +121,62 @@ class Cluster(object):
             'center': self.centroid
         }
 
-    # def describe_tors(self, show_index=False, info=None, tz=None):
-    #     if info is None:
-    #         info = ['time', 'segments', 'casualties', 'minutes']
-    #
-    #     to_join = []
-    #
-    #     if 'time' in info:
-    #         if self._index == NOISE_LABEL:
-    #             time_part = '(Outliers)'
-    #         else:
-    #             time_part = '{} to {}'.format(self.begin_time.strftime('%Y-%m-%d %H:%M'),
-    #                                           self.end_time.strftime('%Y-%m-%d %H:%M'))
-    #             if tz is not None:
-    #                 time_part += ' {}'.format(tz)
-    #             if show_index:
-    #                 time_part = '({}) '.format(self.index) + time_part
-    #         to_join.append(time_part)
-    #
-    #     stats = self.tor_stats()
-    #
-    #     if 'segments' in info:
-    #         ef_labels = ['EF{}'.format(f) for f in range(0, 6)]
-    #         ef_parts = ['{}: {}'.format(label, stats[label.lower()]) for label in ef_labels]
-    #         if stats['ef?']:
-    #             ef_parts.append('EF?: {}'.format(stats['ef?']))
-    #
-    #         segments_part = '{} segments ({})'.format(stats['segments'], ', '.join(ef_parts))
-    #         to_join.append(segments_part)
-    #
-    #     if 'casualties' in info:
-    #         casualty_part = '{} fatalities | {} injuries'.format(stats['fatalities'], stats['injuries'])
-    #         to_join.append(casualty_part)
-    #
-    #     if 'minutes' in info:
-    #         length_part = '{} tornado minutes'.format(len(self))
-    #         to_join.append(length_part)
-    #
-    #     return '\n'.join(to_join)
-    #
-    # def tor_stats(self):
-    #     if self._parent is None:
-    #         raise NotImplementedError("Cannot output tornado stats for empty cluster")
-    #
-    #     all_events = self.events
-    #     tor_events = all_events[all_events.event_type == 'Tornado']
-    #     tor_ef = ef(tor_events)
-    #     tor_longevity = longevity(tor_events)
-    #
-    #     ret = {'ef{}'.format(i): tor_ef[tor_ef == i].count() for i in range(0, 6)}
-    #     ret['ef?'] = tor_ef[tor_ef.isnull()].count()
-    #     ret['segments'] = len(tor_events)
-    #     ret['total_time'] = tor_longevity.sum()
-    #     ret['fatalities'] = tor_events.deaths_direct.sum()
-    #     ret['injuries'] = tor_events.injuries_direct.sum()
-    #
-    #     return ret
+    def describe_tors(self, show_index=False, info=None, tz=None):
+        if info is None:
+            info = ['time', 'segments', 'casualties', 'minutes']
+
+        to_join = []
+
+        if 'time' in info:
+            if self._index == NOISE_LABEL:
+                time_part = '(Outliers)'
+            else:
+                time_part = '{} to {}'.format(self.begin_time.strftime('%Y-%m-%d %H:%M'),
+                                              self.end_time.strftime('%Y-%m-%d %H:%M'))
+                if tz is not None:
+                    time_part += ' {}'.format(tz)
+                if show_index:
+                    time_part = '({}) '.format(self.index) + time_part
+            to_join.append(time_part)
+
+        stats = self.tor_stats()
+
+        if 'segments' in info:
+            ef_labels = ['EF{}'.format(f) for f in range(0, 6)]
+            ef_parts = ['{}: {}'.format(label, stats[label.lower()]) for label in ef_labels]
+            if stats['ef?']:
+                ef_parts.append('EF?: {}'.format(stats['ef?']))
+
+            segments_part = '{} segments ({})'.format(stats['segments'], ', '.join(ef_parts))
+            to_join.append(segments_part)
+
+        if 'casualties' in info:
+            casualty_part = '{} fatalities | {} injuries'.format(stats['fatalities'], stats['injuries'])
+            to_join.append(casualty_part)
+
+        if 'minutes' in info:
+            length_part = '{} tornado minutes'.format(len(self))
+            to_join.append(length_part)
+
+        return '\n'.join(to_join)
+
+    def tor_stats(self):
+        if self._parent is None:
+            raise NotImplementedError("Cannot output tornado stats for empty cluster")
+
+        all_events = self.events
+        tor_events = all_events[all_events.event_type == 'Tornado']
+        tor_ef = tor_events.stevent_tor.ef()
+        tor_longevity = tor_events.stevent_tor.longevity()
+
+        ret = {'ef{}'.format(i): tor_ef[tor_ef == i].count() for i in range(0, 6)}
+        ret['ef?'] = tor_ef[tor_ef.isnull()].count()
+        ret['segments'] = len(tor_events)
+        ret['total_time'] = tor_longevity.sum()
+        ret['fatalities'] = tor_events.deaths_direct.sum()
+        ret['injuries'] = tor_events.injuries_direct.sum()
+
+        return ret
 
     def __eq__(self, other):
         if self is other:
@@ -213,28 +214,33 @@ class ClusterGroupPlotter(object):
         self._cluster_group = cluster_group
         self._grouplen = len(cluster_group)
 
-    def tornadoes(self, cartopymap, colors, cluster_style=None, noise_style=None, plot_noise=True):
+    def tornadoes(self, cartopymap, colors,
+                  plot_noise=True, noise_color='gray',
+                  linewidth=2, shadow=True,
+                  legend=False, tz='CST', legend_text=None):
+
         if isinstance(colors, str):
             colors = sample_colors(self._grouplen, colors)
 
         if isinstance(colors, (list, tuple)):
             colors = cycle(colors)
 
-        if cluster_style is None:
-            cluster_style = dict(linewidth=4.5, shadow=True)
+        if legend:
+            legend = LegendBuilder(ax=cartopymap.ax)
 
-        if noise_style is None:
-            noise_style = dict(linewidth=3, color='gray', shadow=True)
+        for clust, color in zip(self._cluster_group.clusters, colors):
+            clust.events.stevent_plot.tornadoes(cartopymap, color=color,
+                                                linewidth=linewidth, shadow=shadow)
+
+            if legend:
+                legend.append(color, clust.describe_tors(tz=tz, info=legend_text))
 
         if plot_noise:
             noise = self._cluster_group.noise
-            noise.events.stsvr.plot_tornadoes(cartopymap, **noise_style)
+            noise.events.stevent_plot.tornadoes(cartopymap, color=noise_color,
+                                              linewidth=linewidth, shadow=shadow)
 
-        for clust, color in zip(self._cluster_group.clusters, colors):
-            clust.events.stevent_plot.tornadoes(cartopymap, color=color, **cluster_style)
-            # if legend is not None:
-            #     legend.append(color, clust.describe_tors(tz=tz, info=legend_text))
+            if legend:
+                legend.append(noise_color, noise.describe_tors(tz=tz, info=legend_text))
 
-        # if legend is not None:
-        #     legend.append('gray', noise.describe_tors(tz=tz, info=legend_text))
-        #     legend.plot_legend()
+        legend and legend.plot_legend()
