@@ -9,6 +9,7 @@ from geopy.distance import distance
 import matplotlib.pyplot as plt
 
 import config
+from .mapplots import CartopyMapPlotter
 from .mapareas import Geobbox
 
 
@@ -43,6 +44,16 @@ class CartopyMap(object):
             self._init_ax()
         return self._ax
 
+    def _init_ax(self):
+        if self._ax is None:
+            self._ax = plt.axes(projection=self.proj)
+
+        if self.bg is not None:
+            self._ax.background_patch.set_facecolor(self.bg)
+
+        if self.bbox is not None:
+            self._ax.set_extent(self.bbox)
+
     def draw(self, layers='default', lake_threshold=None):
         if not layers or layers == 'default':
             layers = ['coastlines', 'borders', 'states', 'lakes']
@@ -70,15 +81,9 @@ class CartopyMap(object):
     def draw_us_detailed(self):
         self.draw(layers=['default', 'counties', 'highways'])
 
-    def _init_ax(self):
-        if self._ax is None:
-            self._ax = plt.axes(projection=self.proj)
-
-        if self.bg is not None:
-            self._ax.background_patch.set_facecolor(self.bg)
-
-        if self.bbox is not None:
-            self._ax.set_extent(self.bbox)
+    @property
+    def plot(self):
+        return CartopyMapPlotter(self)
 
     def draw_coastlines(self):
         coastlines = cfeat.GSHHSFeature(self.scale, levels=[1])

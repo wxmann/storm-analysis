@@ -2,6 +2,7 @@ import pandas as pd
 from algs.discretize import discretize
 
 def test_discretize_tor():
+    # input event has tz-localized timestamp
     numpts_1 = 10
     t0_1 = pd.Timestamp('2017-01-01 00:00-06:00')
     tor1 = {
@@ -15,6 +16,7 @@ def test_discretize_tor():
         'event_id': 1
     }
 
+    # input event has non tz-localized timestamp
     numpts_2 = 5
     t0_2 = pd.Timestamp('2017-01-08 00:00')
     tor2 = {
@@ -28,6 +30,7 @@ def test_discretize_tor():
         'event_id': 2
     }
 
+    # input event has only one point
     t0_3 = pd.Timestamp('2017-01-09 00:00')
     tor3 = {
         'begin_date_time': t0_3,
@@ -40,7 +43,7 @@ def test_discretize_tor():
         'event_id': 3
     }
 
-    df = pd.DataFrame({0: tor1, 1: tor2, 2: tor3}).transpose()
+    df = pd.DataFrame({0: tor1, 1: tor2, 2: tor3}).T
 
     points = discretize(df)
 
