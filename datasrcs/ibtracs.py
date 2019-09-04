@@ -10,7 +10,10 @@ def ibtracsv4(basin):
     url = f'{_DATA_DIR}/ibtracs.{basin}.list.v04r00.csv'
     save_to_local = savefile(url, in_subdir='ibtracs')
 
-    df = pd.read_csv(save_to_local.dest, skiprows=[1], parse_dates=['ISO_TIME'])
+    df = pd.read_csv(save_to_local.dest,
+                     skiprows=[1],
+                     parse_dates=['ISO_TIME'],
+                     na_values=' ')
     df.columns = map(str.lower, df.columns)
     return df
 
