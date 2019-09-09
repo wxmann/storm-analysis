@@ -1,5 +1,4 @@
 import numpy as np
-import pandas as pd
 from geopy.distance import great_circle
 
 
@@ -42,6 +41,11 @@ def forward_motion(df, periods=1, cols=None, synoptic_times=True):
     return dists, speeds, angles
 
 
+def rolling_dists(df, periods, cols=None, synoptic_times=True):
+    dists, _, _ = forward_motion(df, cols=cols, synoptic_times=synoptic_times)
+    return dists.rolling(periods).sum().shift(1 - periods)
+
+
 def stalls(df, threshold_nm, time_periods, cols=None):
     if cols is None:
         cols = dict(
@@ -51,11 +55,6 @@ def stalls(df, threshold_nm, time_periods, cols=None):
             lon='lon'
         )
     df = df[df[cols['timestamp']].dt.hour.isin([0, 6, 12, 18])]
-
-    queries = []
-    for i in range(1, time_periods + 1):
-        dists, _, _ = forward_motion(df, i, cols=cols)
-        queries.append(dists <= threshold_nm)
-
-    stall_query = pd.concat(queries, axis=1).all(axis=1)
-    return df[stall_query]
+    dists = rolling_dists(df, periods=time_periods, cols=cols)
+    detected_stalls = dists < threshold_nm
+    return df[detected_stalls]
