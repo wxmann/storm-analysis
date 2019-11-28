@@ -1,114 +1,113 @@
-from functools import lru_cache
+from functools import partial
 
-import xarray as xr
-import pandas as pd
 import numpy as np
+import pandas as pd
+import xarray as xr
 
-from ops import update_accessors
-
-
-@lru_cache()
-def _dataset_for(folder, file):
-    url = f'https://www.esrl.noaa.gov/psd/thredds/dodsC/Datasets/{folder}/{file}.nc'
-    return xr.open_dataset(url)
+BASE_URI = 'http://www.esrl.noaa.gov/psd/thredds/dodsC/Datasets'
 
 
-def _filter_dataset_for(ds, level, when):
-    kw = {}
-    if level is not None:
-        kw['level'] = level
-    if when is not None:
-        kw['time'] = when
-    return ds.sel(**kw)
+def dailyavg(product, query, with_shiftgrid=False):
+    all_dailyavg_years = range(1948, pd.Timestamp.now().year)
+    years = _coerce_to_list(query.get('year', all_dailyavg_years))
+
+    load_func = partial(_load_ncep, folder='ncep.reanalysis.dailyavgs',
+                        product=product, query=query,
+                        with_shiftgrid=with_shiftgrid)
+    results = []
+    for yr in years:
+        results.append(load_func(yr))
+
+    print(f'Combining data from years for {product}')
+    return xr.concat(results, dim='time')
 
 
-latlon_accessor_update = update_accessors(latlon=['lat', 'lon'])
+def dailyavg_ltm(product, query, with_shiftgrid=False):
+    product += '.day'
+    year = '1981-2010.ltm'
+    folder = 'ncep.reanalysis.derived'
+    result = _load_ncep(year, folder, product, query, with_shiftgrid)
 
-
-class Daily4X(object):
-    def __init__(self):
-        pass
-
-    def _get_times(self, when):
-        if isinstance(when, str):
-            return [pd.Timestamp(when)]
-        try:
-            iter(when)
-        except TypeError:
-            times = [pd.Timestamp(when)]
-        else:
-            times = [pd.Timestamp(ts) for ts in when]
-        return times
-
-    def _construct_year_map(self, datetimes):
-        year_map = {}
-        for time_ in datetimes:
-            year = time_.year
-            if year not in year_map:
-                year_map[year] = []
-            year_map[year].append(time_)
-        return year_map
-
-    @latlon_accessor_update
-    def hgt(self, when, level=None):
-        if isinstance(when, int):
-            return _dataset_for('ncep.reanalysis/pressure', f'hgt.{when}')
-
-        year_map = self._construct_year_map(self._get_times(when))
+    years = _coerce_to_list(query.get('year', []))
+    if years:
+        orig_times = result.time.values
         concat_datasets = []
-
-        for year in year_map:
-            ds = _dataset_for('ncep.reanalysis/pressure', f'hgt.{year}')
-            datetimes = year_map[year]
-            filtered = _filter_dataset_for(ds, level, when=datetimes)
-            concat_datasets.append(filtered)
-
-        return xr.concat(concat_datasets, dim='time')
-
-    @latlon_accessor_update
-    def hgt_ltm(self, when=None, level=None):
-        ds = _dataset_for('ncep.reanalysis.derived/pressure', 'hgt.4Xday.1981-2010.ltm')
-        ds_lev_filtered = _filter_dataset_for(ds, level=level, when=None)
-
-        if when is None:
-            return ds_lev_filtered
-
-        year_map = self._construct_year_map(self._get_times(when))
-        concat_datasets = []
-
-        # this is required because the ltm files are loaded with year=0, and hence loaded as cftimes
-        # rather than typical np times.
-        orig_times = ds_lev_filtered.time.values
-
-        for year in year_map:
+        for year in years:
+            ds_for_year = result.copy()
             newtimes = np.array([pd.Timestamp(year=year,
                                               month=t.month,
                                               day=t.day,
                                               hour=t.hour,
                                               minute=t.minute) for t in orig_times])
-            ds_lev_filtered['time'] = newtimes
-            concat_datasets.append(ds_lev_filtered.sel(time=year_map[year]))
+            ds_for_year['time'] = newtimes
+            concat_datasets.append(ds_for_year)
 
+        print(f'Creating long-term mean timeseries of {product}')
         return xr.concat(concat_datasets, dim='time')
 
-    def hgt_anom(self, when, level=None):
-        return self.hgt(when, level) - self.hgt_ltm(when, level)
-    
-    @latlon_accessor_update
-    def mslp(self, when=None):
-        if isinstance(when, int):
-            return _dataset_for('ncep.reanalysis/surface', f'slp.{when}')
-
-        year_map = self._construct_year_map(self._get_times(when))
-        concat_datasets = []
-
-        for year in year_map:
-            ds = _dataset_for('ncep.reanalysis/surface', f'slp.{year}')
-            datetimes = year_map[year]
-            filtered = _filter_dataset_for(ds, level=None, when=datetimes)
-            concat_datasets.append(filtered)
-
-        return xr.concat(concat_datasets, dim='time')
+    return result
 
 
-daily4x = Daily4X()
+def _load_ncep(year, folder, product, query, with_shiftgrid):
+    url = f'{BASE_URI}/{folder}/{product}.{year}.nc'
+    ds = xr.open_dataset(url)
+    ds = select(ds, query, with_shiftgrid=with_shiftgrid)
+    # print(f'loaded for year {year}')
+    return ds
+
+
+def select(data, query, with_shiftgrid=False):
+    kw = {}
+
+    level_param = query.get('pressure_level', [])
+    if level_param:
+        kw['level'] = level_param
+
+    months = _coerce_to_list(query.get('month', []))
+    days = _coerce_to_list(query.get('day', []))
+    hours = _coerce_to_list(query.get('hour', []))
+
+    if all([not months, not days, not hours]):
+        pass
+    else:
+        time_query = np.in1d([1], [1])
+        if months:
+            time_query &= np.in1d(data['time.month'], months)
+        if days:
+            time_query &= np.in1d(data['time.day'], days)
+        if hours:
+            time_query &= np.in1d(data['time.hour'], hours)
+
+        kw['time'] = time_query
+
+    result = data.sel(**kw)
+
+    if with_shiftgrid:
+        result = shiftgrid(result)
+
+    area_param = query.get('area', None)
+    if area_param:
+        area_kw = {}
+        north, west, south, east = map(float, area_param.split('/'))
+        lat_query = slice(north, south)
+        lon_query = slice(west, east)
+        area_kw['lat'] = lat_query
+        area_kw['lon'] = lon_query
+        return result.sel(**area_kw)
+
+    return result
+
+
+def shiftgrid(ds, londim='lon', copy=False):
+    shifted = ds.copy() if copy else ds
+    londata = shifted[londim].values
+    londata_shifted = np.where((londata >= -180) & (londata <= 180), londata, -360 + londata)
+    shifted[londim] = londata_shifted
+    shifted = shifted.sortby(londim)
+    return shifted
+
+
+def _coerce_to_list(val):
+    if isinstance(val, (float, int, str)):
+        return [val]
+    return val

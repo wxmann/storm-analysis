@@ -1,5 +1,6 @@
 import xarray as xr
 import numpy as np
+from scipy import fftpack
 
 from .op_shared import LatLonAware
 
@@ -31,3 +32,18 @@ class GeospatialDataset(LatLonAware):
         lonslice = slice(lon0, lon1)
         latslice = slice(lat1, lat0) if descending_lats else slice(lat0, lat1)
         return self._ds.sel({latdim: latslice, londim: lonslice})
+
+
+@xr.register_dataset_accessor('fft')
+class FftDataset():
+    def __init__(self, ds):
+        super().__init__()
+        self._ds = ds
+
+    def power_spectrum(self, var, sample_spacing):
+        fft_in = self._ds[var]
+        sig_fft = fftpack.fft(fft_in)
+        power = np.abs(sig_fft) ** 2
+        sample_freq = fftpack.fftfreq(fft_in.size, sample_spacing)
+        positive_freq = sample_freq > 0
+        return sample_freq[positive_freq], power[positive_freq]
